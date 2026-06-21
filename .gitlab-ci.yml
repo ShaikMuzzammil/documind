@@ -1,0 +1,43 @@
+# DocuMind CI — install, lint, type-check, build on every push/MR.
+stages:
+  - install
+  - verify
+  - build
+
+default:
+  image: node:20-alpine
+  cache:
+    key:
+      files:
+        - package-lock.json
+        - package.json
+    paths:
+      - node_modules/
+
+install:
+  stage: install
+  script:
+    - npm install
+  artifacts:
+    paths:
+      - node_modules/
+    expire_in: 1 hour
+
+lint:
+  stage: verify
+  needs: [install]
+  script:
+    - npm run lint
+  allow_failure: true
+
+typecheck:
+  stage: verify
+  needs: [install]
+  script:
+    - npm run typecheck
+
+build:
+  stage: build
+  needs: [install]
+  script:
+    - npm run build
