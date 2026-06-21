@@ -49,7 +49,7 @@ async function remoteEmbed(texts: string[]): Promise<number[][]> {
   return data.data.map((d) => d.embedding);
 }
 
-/** Embed a batch of texts. Never throws — falls back to local embeddings. */
+/** Embed a batch of texts. Never throws - falls back to local embeddings. */
 export async function embed(texts: string[]): Promise<number[][]> {
   if (!texts.length) return [];
   if (!API_KEY) return texts.map(localEmbed);
@@ -57,7 +57,7 @@ export async function embed(texts: string[]): Promise<number[][]> {
   try {
     return await remoteEmbed(texts);
   } catch {
-    // Provider has no embeddings endpoint or failed — degrade gracefully.
+    // Provider has no embeddings endpoint or failed - degrade gracefully.
     return texts.map(localEmbed);
   }
 }

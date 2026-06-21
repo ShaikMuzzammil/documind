@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { requireCurrentUser } from '@/lib/auth';
 import { embedOne } from '@/lib/embeddings';
 import { search } from '@/lib/store';
 import { buildMessages, streamChat } from '@/lib/llm';
@@ -7,6 +8,13 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
+  const user = await requireCurrentUser(req).catch(() => null);
+  if (!user) {
+    return new Response(JSON.stringify({ error: 'Authentication required' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   const body = await req.json().catch(() => ({}));
   const question = (body.question || '').toString().trim();
   const collectionId = body.collectionId ? body.collectionId.toString() : undefined;
@@ -20,7 +28,7 @@ export async function POST(req: NextRequest) {
 
   // 1) Retrieve relevant chunks.
   const queryEmbedding = await embedOne(question);
-  const citations = await search(queryEmbedding, { collectionId, topK: 5 });
+  const citations = await search(queryEmbedding, { userId: user.id, collectionId, topK: 5 });
 
   // 2) Stream a grounded answer. Citations are sent first as a JSON header line,
   //    then the model tokens follow. The client splits on the first newline.

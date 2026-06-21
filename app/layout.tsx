@@ -8,7 +8,7 @@ const inter = Inter({ variable: '--font-inter', subsets: ['latin'] });
 const mono = JetBrains_Mono({ variable: '--font-mono', subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'DocuMind — Chat with your documents',
+  title: 'DocuMind - Chat with your documents',
   description:
     'An AI knowledge workspace: upload documents, ask questions, and get answers with citations. Retrieval-augmented generation, done right.',
   keywords: ['RAG', 'AI', 'documents', 'embeddings', 'vector search', 'LLM', 'chatbot'],

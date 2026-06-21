@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { BrainCircuit, ArrowRight } from 'lucide-react';
+import { BrainCircuit, ArrowRight, LogOut, UserRound } from 'lucide-react';
+import { useUser } from '@/lib/use-user';
 
 const HOME_SECTIONS = [
   { id: 'features', label: 'Features' },
@@ -18,6 +19,13 @@ export default function Navigation() {
   const isHome = pathname === '/';
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive] = useState('features');
+  const { user, loading, refresh } = useUser();
+
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    await refresh();
+    window.location.href = '/auth';
+  };
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -81,13 +89,35 @@ export default function Navigation() {
           </div>
         )}
 
-        <Link
-          href="/chat"
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white text-sm font-semibold rounded-lg hover:opacity-90 transition-opacity"
-        >
-          Open app
-          <ArrowRight className="w-3.5 h-3.5" />
-        </Link>
+        <div className="flex items-center gap-2">
+          {user ? (
+            <>
+              <Link
+                href="/chat"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                Open app
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <button
+                onClick={logout}
+                className="hidden h-9 items-center gap-1.5 rounded-lg border border-border bg-bg-card px-3 text-xs text-text-secondary transition-colors hover:text-text-primary sm:inline-flex"
+                title={`Signed in as ${user.email}`}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                Logout
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/auth"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              {loading ? 'Checking' : 'Sign in'}
+              <UserRound className="h-3.5 w-3.5" />
+            </Link>
+          )}
+        </div>
       </div>
     </motion.nav>
   );

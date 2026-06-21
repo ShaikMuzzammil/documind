@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireCurrentUser } from '@/lib/auth';
 import { chunkText } from '@/lib/chunk';
 import { embed } from '@/lib/embeddings';
 import { addChunks, saveDocument } from '@/lib/store';
@@ -24,6 +25,8 @@ async function extractText(file: File): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
+  const user = await requireCurrentUser(req).catch(() => null);
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   const form = await req.formData();
   const file = form.get('file');
   const collectionId = (form.get('collectionId') || '').toString();
@@ -38,6 +41,7 @@ export async function POST(req: NextRequest) {
   const docId = generateId();
   const baseDoc: DocumentMeta = {
     id: docId,
+    userId: user.id,
     name: file.name,
     type: file.type || 'text/plain',
     size: file.size,
@@ -60,6 +64,7 @@ export async function POST(req: NextRequest) {
     const embeddings = await embed(pieces);
     const chunks: Chunk[] = pieces.map((textPiece, i) => ({
       id: generateId(),
+      userId: user.id,
       documentId: docId,
       collectionId,
       index: i,

@@ -49,7 +49,7 @@ export async function streamChat(
         controller.enqueue(
           encoder.encode(
             'LLM is not configured. Add LLM_API_KEY to .env.local to enable AI answers. ' +
-              'Retrieval and citations still work — see the sources below.',
+              'Retrieval and citations still work - see the sources below.',
           ),
         );
         controller.close();

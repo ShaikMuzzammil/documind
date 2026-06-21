@@ -10,8 +10,6 @@ import { Pool } from 'pg';
 import { Chunk, Citation, Collection, DocumentMeta, User } from '../types';
 import { StorageAdapter, SearchOpts } from './adapter';
 
-const EMBED_DIM = Number(process.env.EMBED_DIM || 384);
-
 let pool: Pool | null = null;
 function getPool(): Pool {
   if (!pool) {
@@ -72,7 +70,7 @@ export class PostgresAdapter implements StorageAdapter {
         collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
         idx INTEGER NOT NULL,
         text TEXT NOT NULL,
-        embedding vector(${EMBED_DIM})
+        embedding vector
       )`);
     await db.query(
       'CREATE INDEX IF NOT EXISTS chunks_user_collection_idx ON chunks (user_id, collection_id)',
@@ -80,7 +78,7 @@ export class PostgresAdapter implements StorageAdapter {
     this.ready = true;
   }
 
-  // ── Users ──
+  // Users
   async createUser(user: User, passwordHash: string): Promise<User> {
     await this.init();
     await getPool().query(
@@ -118,7 +116,7 @@ export class PostgresAdapter implements StorageAdapter {
     return { id: r.id, email: r.email, name: r.name, createdAt: new Date(r.created_at).toISOString() };
   }
 
-  // ── Collections ──
+  // Collections
   async getCollections(userId: string): Promise<Collection[]> {
     await this.init();
     const { rows } = await getPool().query(
@@ -148,7 +146,7 @@ export class PostgresAdapter implements StorageAdapter {
     await getPool().query('DELETE FROM collections WHERE id=$1 AND user_id=$2', [id, userId]);
   }
 
-  // ── Documents ──
+  // Documents
   async getDocuments(userId: string, collectionId?: string): Promise<DocumentMeta[]> {
     await this.init();
     const params: unknown[] = [userId];
@@ -189,7 +187,7 @@ export class PostgresAdapter implements StorageAdapter {
     await getPool().query('DELETE FROM documents WHERE id=$1 AND user_id=$2', [id, userId]);
   }
 
-  // ── Chunks + retrieval ──
+  // Chunks + retrieval
   async addChunks(chunks: Chunk[]): Promise<void> {
     if (!chunks.length) return;
     await this.init();

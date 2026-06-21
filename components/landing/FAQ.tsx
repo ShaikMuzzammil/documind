@@ -11,7 +11,7 @@ const ITEMS = [
   },
   {
     q: 'Do I need an API key?',
-    a: 'For AI answers, yes — any OpenAI-compatible key (Groq has a generous free tier). Without a key, retrieval and citations still work and the app tells you to add one.',
+    a: 'For AI answers, yes - any OpenAI-compatible key (Groq has a generous free tier). Without a key, retrieval and citations still work and the app tells you to add one.',
   },
   {
     q: 'How are answers kept accurate?',
@@ -19,11 +19,11 @@ const ITEMS = [
   },
   {
     q: 'Where is my data stored?',
-    a: 'In Phase 1, documents and embeddings are stored locally in a data directory. Phase 2 introduces Postgres + pgvector for multi-user persistence.',
+    a: 'Local development uses a git-ignored data directory. Production should use Postgres with pgvector so every account keeps its own documents and embeddings.',
   },
   {
     q: 'Is it free?',
-    a: 'Yes. DocuMind is free and open — no login, no pricing, no usage limits in the app itself.',
+    a: 'The app code is free to run. Your actual cost depends on your AI, database, and optional email providers.',
   },
 ];
 

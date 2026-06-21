@@ -39,7 +39,7 @@ export class JsonAdapter implements StorageAdapter {
     await ensureDir();
   }
 
-  // ── Users ──
+  // Users
   async createUser(user: User, passwordHash: string): Promise<User> {
     const all = await readJson<StoredUser[]>(USERS_FILE, []);
     all.push({ ...user, passwordHash });
@@ -59,7 +59,7 @@ export class JsonAdapter implements StorageAdapter {
     return { id: u.id, email: u.email, name: u.name, createdAt: u.createdAt };
   }
 
-  // ── Collections ──
+  // Collections
   async getCollections(userId: string): Promise<Collection[]> {
     const all = await readJson<Collection[]>(COLLECTIONS_FILE, []);
     return all.filter((c) => c.userId === userId);
@@ -86,7 +86,7 @@ export class JsonAdapter implements StorageAdapter {
     await writeJson(CHUNKS_FILE, chunks);
   }
 
-  // ── Documents ──
+  // Documents
   async getDocuments(userId: string, collectionId?: string): Promise<DocumentMeta[]> {
     let all = (await readJson<DocumentMeta[]>(DOCUMENTS_FILE, [])).filter(
       (d) => d.userId === userId,
@@ -113,7 +113,7 @@ export class JsonAdapter implements StorageAdapter {
     await writeJson(CHUNKS_FILE, chunks);
   }
 
-  // ── Chunks + retrieval ──
+  // Chunks + retrieval
   async addChunks(newChunks: Chunk[]): Promise<void> {
     const all = await readJson<Chunk[]>(CHUNKS_FILE, []);
     await writeJson(CHUNKS_FILE, [...all, ...newChunks]);

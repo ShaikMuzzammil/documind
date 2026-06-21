@@ -174,7 +174,7 @@ export default function HomePage() {
             Open DocuMind <ArrowRight className="w-4 h-4" />
           </Link>
           <p className="mt-10 text-sm text-text-muted">
-            DocuMind · Free &amp; open · Built with Next.js
+            DocuMind - Free &amp; open - Built with Next.js
           </p>
         </div>
       </footer>

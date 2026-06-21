@@ -2,6 +2,7 @@
 node_modules/
 .pnp
 .pnp.js
+.pnpm-store/
 
 # Next.js
 /.next/
@@ -16,6 +17,7 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # Local env files (never commit secrets; .env.example IS committed)
 .env
@@ -30,6 +32,11 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Coverage and test output
+coverage/
+playwright-report/
+test-results/
 
 # IDE
 .vscode/

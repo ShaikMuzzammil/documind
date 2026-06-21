@@ -1,93 +1,148 @@
 # DocuMind
 
+DocuMind is a real multi-user document intelligence app. Users create accounts, upload documents into private collections, and ask questions that stream grounded answers with source citations.
 
+## What It Does
 
-## Getting started
+- Real signup, login, logout, secure HTTP-only session cookies, and password hashing
+- Per-user collections, documents, chunks, and vector search isolation
+- PDF/text/Markdown/CSV/JSON/code-like document ingestion
+- Chunking, embeddings, semantic retrieval, and cited RAG answers
+- Documents dashboard with upload, drag/drop, filtering, deletion, stats, and live refresh
+- Collections dashboard with workspace creation, document counts, chunk counts, and scoped chat links
+- Optional welcome email for new accounts through Resend
+- Local JSON storage for development and Postgres + pgvector for production
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Useful Environment Variables Only
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+Create `.env.local` from `.env.example`:
 
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
+```bash
+cp .env.example .env.local
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/dreams-lab-group/documind.git
-git branch -M main
-git push -uf origin main
+
+### App
+
+| Variable | Required | Where to get it |
+| --- | --- | --- |
+| `NEXT_PUBLIC_APP_URL` | Yes | Local: `http://localhost:3000`. Vercel: your deployed app URL |
+| `AUTH_SECRET` | Production yes | Generate yourself with `openssl rand -base64 32` |
+
+### AI
+
+| Variable | Required | Where to get it |
+| --- | --- | --- |
+| `LLM_API_KEY` | Yes for AI answers | OpenAI dashboard API keys, or another OpenAI-compatible provider |
+| `LLM_BASE_URL` | Yes | OpenAI: `https://api.openai.com/v1` |
+| `LLM_CHAT_MODEL` | Yes | Example: `gpt-4o-mini` |
+| `LLM_EMBED_MODEL` | Yes | Example: `text-embedding-3-small` |
+
+OpenAI is recommended because one key works for chat and embeddings. If your provider does not support embeddings, DocuMind falls back to local hashing embeddings so the app still runs.
+
+### Database
+
+| Variable | Required | Where to get it |
+| --- | --- | --- |
+| `DATABASE_URL` | Production yes | Neon, Supabase, or any Postgres database with pgvector |
+| `DATABASE_SSL` | No | Keep `true` for hosted databases |
+
+Leave `DATABASE_URL` empty only for local development. The app will use the git-ignored `./data` JSON store.
+
+### Email
+
+| Variable | Required | Where to get it |
+| --- | --- | --- |
+| `RESEND_API_KEY` | Optional | Resend API Keys page |
+| `EMAIL_FROM` | Optional | A verified sender/domain in Resend, for example `DocuMind <onboarding@yourdomain.com>` |
+
+If email variables are empty, signup still works. The welcome email is simply skipped.
+
+## Where To Get The Keys
+
+- OpenAI API key: create a key in the OpenAI Platform API keys page.
+- Database URL: create a Postgres project in Neon or Supabase, enable/install pgvector, then copy the pooled connection string.
+- Resend API key: create a Resend account, verify your sending domain or sender address, then create an API key.
+- Auth secret: generate locally; do not get this from a provider.
+
+## Local Development
+
+```bash
+npm install
+npm run dev
 ```
 
-## Integrate with your tools
+Open:
 
-* [Set up project integrations](https://gitlab.com/dreams-lab-group/documind/-/settings/integrations)
+```txt
+http://localhost:3000
+```
 
-## Collaborate with your team
+Recommended checks before pushing:
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+```bash
+npm run typecheck
+npm run lint
+npm run build
+```
 
-## Test and Deploy
+## Vercel Deployment
 
-Use the built-in continuous integration in GitLab.
+1. Push the repo to GitHub.
+2. Import the repo into Vercel.
+3. Add the environment variables from `.env.example`.
+4. Set `NEXT_PUBLIC_APP_URL` to your Vercel production URL.
+5. Set `AUTH_SECRET` to a long random value.
+6. Set `DATABASE_URL` to a hosted Postgres database with pgvector.
+7. Set `LLM_API_KEY` and model values.
+8. Optionally set `RESEND_API_KEY` and `EMAIL_FROM`.
+9. Deploy.
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+Vercel settings:
 
-***
+```txt
+Framework Preset: Next.js
+Install Command: npm install
+Build Command: npm run build
+Output Directory: .next
+Node.js Version: 20.x or newer
+```
 
-# Editing this README
+## Project Structure
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+```txt
+app/
+  api/auth/             Register, login, logout
+  api/chat/             Authenticated cited chat
+  api/collections/      Authenticated collection CRUD
+  api/documents/        Authenticated document CRUD
+  api/ingest/           Authenticated document ingestion
+  auth/                 Login and signup page
+  chat/                 Chat workspace
+  collections/          Collection dashboard
+  documents/            Document dashboard
+components/
+  app/                  Auth gate, citations, collection picker
+  landing/              Landing FAQ
+  shared/               Navigation and app sidebar
+lib/
+  auth.ts               Signed session cookies
+  mail.ts               Optional Resend welcome email
+  storage/              JSON and Postgres adapters
+  embeddings.ts         Remote/local embeddings
+  llm.ts                Streaming OpenAI-compatible chat
+```
 
-## Suggestions for a good README
+## Do Not Commit
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+These are already ignored:
 
-## Name
-Choose a self-explaining name for your project.
+```txt
+node_modules/
+.next/
+.vercel/
+data/
+.env
+.env.local
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Keep `package-lock.json`; it helps Vercel install the exact dependency tree.
