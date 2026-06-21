@@ -1,7 +1,15 @@
 // Shared domain types for DocuMind.
 
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: string;
+}
+
 export interface DocumentMeta {
   id: string;
+  userId: string;
   name: string;
   type: string;
   size: number;
@@ -14,6 +22,7 @@ export interface DocumentMeta {
 
 export interface Collection {
   id: string;
+  userId: string;
   name: string;
   description?: string;
   createdAt: string;
@@ -21,6 +30,7 @@ export interface Collection {
 
 export interface Chunk {
   id: string;
+  userId: string;
   documentId: string;
   collectionId: string;
   index: number;
