@@ -1,4 +1,11 @@
 # DocuMind CI — install, lint, type-check, build on every push/MR.
+# Jobs only run when a runner/pipeline is available; missing CI minutes will
+# leave the pipeline pending rather than blocking merges.
+workflow:
+  rules:
+    - if: '$CI_MERGE_REQUEST_IID'
+    - if: '$CI_COMMIT_BRANCH'
+
 stages:
   - install
   - verify
