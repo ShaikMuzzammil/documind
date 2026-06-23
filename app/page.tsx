@@ -8,7 +8,7 @@ import {
   Database, GitBranch, Globe, Lock, ChevronRight, Star,
   BarChart3, Code2, Cpu, Workflow, CheckCircle, ExternalLink,
   Brain, ScanText, FolderKanban, X, TrendingUp, Activity,
-  FileCode, FileSpreadsheet, Package, Users, Clock,
+  FileCode, FileSpreadsheet, Package,
 } from 'lucide-react';
 import FAQ from '@/components/landing/FAQ';
 import { useRef } from 'react';

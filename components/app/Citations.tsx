@@ -37,7 +37,9 @@ export default function Citations({ citations }: { citations: Citation[] }) {
   if (!citations.length) return null;
 
   const toggle = (id: string) => setExpanded((p) => {
-    const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n;
+    const n = new Set(p);
+    if (n.has(id)) { n.delete(id); } else { n.add(id); }
+    return n;
   });
 
   const avgScore = citations.reduce((s, c) => s + c.score, 0) / citations.length;
