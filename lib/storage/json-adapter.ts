@@ -142,4 +142,14 @@ export class JsonAdapter implements StorageAdapter {
         score,
       }));
   }
+  async updateCollection(userId: string, id: string, patch: Partial<Pick<Collection,'name'|'description'>>): Promise<Collection | null> {
+    const all = await readJson<Collection[]>(COLLECTIONS_FILE, []);
+    const idx = all.findIndex((c) => c.id === id && c.userId === userId);
+    if (idx === -1) return null;
+    if (patch.name !== undefined) all[idx].name = patch.name;
+    if (patch.description !== undefined) all[idx].description = patch.description;
+    await writeJson(COLLECTIONS_FILE, all);
+    return all[idx];
+  }
+
 }

@@ -240,4 +240,20 @@ export class PostgresAdapter implements StorageAdapter {
       score: Number(r.score),
     }));
   }
+  async updateCollection(userId: string, id: string, patch: Partial<Pick<Collection,'name'|'description'>>): Promise<Collection | null> {
+    await this.init();
+    const sets: string[] = [];
+    const params: unknown[] = [id, userId];
+    if (patch.name !== undefined) { params.push(patch.name); sets.push(`name=$${params.length}`); }
+    if (patch.description !== undefined) { params.push(patch.description); sets.push(`description=$${params.length}`); }
+    if (!sets.length) return null;
+    const { rows } = await getPool().query(
+      `UPDATE collections SET ${sets.join(',')} WHERE id=$1 AND user_id=$2 RETURNING id,user_id,name,description,created_at`,
+      params,
+    );
+    if (!rows.length) return null;
+    const r = rows[0];
+    return { id: r.id, userId: r.user_id, name: r.name, description: r.description || undefined, createdAt: new Date(r.created_at).toISOString() };
+  }
+
 }

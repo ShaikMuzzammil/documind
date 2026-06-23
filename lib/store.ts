@@ -43,3 +43,11 @@ export async function search(
 ): Promise<Citation[]> {
   return getStorage().search(queryEmbedding, opts);
 }
+
+export async function updateCollection(
+  userId: string,
+  id: string,
+  patch: Partial<Pick<import('./types').Collection, 'name' | 'description'>>,
+): Promise<import('./types').Collection | null> {
+  return getStorage().updateCollection(userId, id, patch);
+}

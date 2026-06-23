@@ -139,3 +139,16 @@ html, body {
 @media print {
   nav, aside, .no-print { display: none !important; }
 }
+
+/* Hide scrollbar while keeping scroll behaviour */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Prose colours inside ReactMarkdown */
+.prose-sm a           { color: var(--accent-2); }
+.prose-sm code        { background: rgba(124,58,237,.12); padding: 1px 4px; border-radius: 4px; font-size: .82em; }
+.prose-sm pre code    { background: transparent; padding: 0; }
+.prose-sm blockquote  { border-left: 2px solid var(--border-accent); padding-left: .75rem; color: var(--text-secondary); }
+.prose-sm h1,.prose-sm h2,.prose-sm h3 { font-weight: 600; margin-top: .75rem; margin-bottom: .25rem; }
+.prose-sm ul { list-style: disc; padding-left: 1.25rem; }
+.prose-sm ol { list-style: decimal; padding-left: 1.25rem; }

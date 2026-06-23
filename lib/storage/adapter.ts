@@ -23,6 +23,7 @@ export interface StorageAdapter {
   // Collections
   getCollections(userId: string): Promise<Collection[]>;
   createCollection(c: Collection): Promise<Collection>;
+  updateCollection(userId: string, id: string, patch: Partial<Pick<Collection,'name'|'description'>>): Promise<Collection | null>;
   deleteCollection(userId: string, id: string): Promise<void>;
 
   // Documents
