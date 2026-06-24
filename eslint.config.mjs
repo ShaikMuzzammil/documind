@@ -3,9 +3,8 @@ import { fileURLToPath } from 'url';
 import { FlatCompat } from '@eslint/eslintrc';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({ baseDirectory: __dirname });
+const __dirname  = dirname(__filename);
+const compat     = new FlatCompat({ baseDirectory: __dirname });
 
 const config = [
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
@@ -14,16 +13,25 @@ const config = [
   },
   {
     rules: {
-      // Allow unused vars starting with _ (convention for intentionally unused)
+      // Allow _prefixed vars as intentionally unused
       '@typescript-eslint/no-unused-vars': ['error', {
-        varsIgnorePattern: '^_',
-        argsIgnorePattern: '^_',
-        ignoreRestSiblings: true,
+        varsIgnorePattern:    '^_',
+        argsIgnorePattern:    '^_',
+        caughtErrors:         'none',        // never error on empty catch (err)
+        ignoreRestSiblings:   true,
       }],
-      // Allow explicit any in chart tooltip callbacks (Recharts)
-      '@typescript-eslint/no-explicit-any': 'warn',
+      // Recharts tooltip callbacks need any
+      '@typescript-eslint/no-explicit-any': 'off',
+      // Allow void expressions (fire-and-forget async calls)
+      '@typescript-eslint/no-floating-promises': 'off',
       // Allow empty catch blocks
       'no-empty': ['error', { allowEmptyCatch: true }],
+      // Allow bare-label ternaries in some patterns — handled by caughtErrors:none above
+      '@typescript-eslint/no-unused-expressions': ['error', {
+        allowShortCircuit:   true,
+        allowTernary:        false,
+        allowTaggedTemplates: true,
+      }],
     },
   },
 ];
