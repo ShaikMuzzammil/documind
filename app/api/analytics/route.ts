@@ -1,66 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireCurrentUser } from '@/lib/auth';
-import { getDocuments, getCollections } from '@/lib/store';
-import { usingPostgres } from '@/lib/storage';
+import { getCollections, getDocuments } from '@/lib/store';
+import { formatBytes } from '@/lib/utils';
 
 export async function GET(req: NextRequest) {
   const user = await requireCurrentUser(req).catch(() => null);
-  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const [documents, collections] = await Promise.all([
-    getDocuments(user.id),
+  const [collections, docs] = await Promise.all([
     getCollections(user.id),
+    getDocuments(user.id),
   ]);
 
-  // Per-collection aggregates
-  const colMap = new Map(
-    collections.map((c) => [c.id, { id: c.id, name: c.name, docs: 0, chunks: 0, size: 0, ready: 0, error: 0 }]),
-  );
-  for (const doc of documents) {
-    const col = colMap.get(doc.collectionId);
-    if (!col) continue;
-    col.docs += 1;
-    col.chunks += doc.chunkCount;
-    col.size += doc.size;
-    if (doc.status === 'ready') col.ready += 1;
-    if (doc.status === 'error') col.error += 1;
-  }
+  const totalSize    = docs.reduce((s, d) => s + d.size, 0);
+  const totalChunks  = docs.reduce((s, d) => s + d.chunkCount, 0);
+  const readyDocs    = docs.filter((d) => d.status === 'ready');
+  const errorDocs    = docs.filter((d) => d.status === 'error');
+  const processDocs  = docs.filter((d) => d.status === 'processing');
 
-  // File-type breakdown
+  // File type breakdown
   const typeMap: Record<string, number> = {};
-  for (const doc of documents) {
-    const raw = doc.name.includes('.') ? doc.name.split('.').pop()!.toLowerCase() : 'other';
-    const ext = raw.length <= 6 ? `.${raw}` : 'other';
-    typeMap[ext] = (typeMap[ext] || 0) + 1;
+  for (const d of docs) {
+    const ext = d.name.split('.').pop()?.toLowerCase() ?? 'other';
+    typeMap[ext] = (typeMap[ext] ?? 0) + 1;
   }
   const typeBreakdown = Object.entries(typeMap)
-    .map(([ext, count]) => ({ ext, count }))
-    .sort((a, b) => b.count - a.count);
+    .sort((a, b) => b[1] - a[1])
+    .map(([type, count]) => ({ type, count }));
 
-  // Status breakdown
-  const statusMap: Record<string, number> = { ready: 0, processing: 0, error: 0 };
-  for (const doc of documents) statusMap[doc.status] = (statusMap[doc.status] || 0) + 1;
+  // Per-collection stats
+  const colStats = collections.map((col) => {
+    const colDocs   = docs.filter((d) => d.collectionId === col.id);
+    const colSize   = colDocs.reduce((s, d) => s + d.size, 0);
+    const colChunks = colDocs.reduce((s, d) => s + d.chunkCount, 0);
+    return {
+      id:         col.id,
+      name:       col.name,
+      docCount:   colDocs.length,
+      chunkCount: colChunks,
+      sizeBytes:  colSize,
+      sizeLabel:  formatBytes(colSize),
+    };
+  });
 
-  // Recent 8 documents
-  const recent = [...documents]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 8);
+  // Recent 10 docs
+  const recent = docs.slice(0, 10).map((d) => ({
+    id:         d.id,
+    name:       d.name,
+    status:     d.status,
+    chunkCount: d.chunkCount,
+    sizeLabel:  formatBytes(d.size),
+    createdAt:  d.createdAt,
+    collection: collections.find((c) => c.id === d.collectionId)?.name ?? 'Unknown',
+  }));
 
   return NextResponse.json({
-    overview: {
-      totalDocs: documents.length,
-      readyDocs: statusMap.ready || 0,
-      processingDocs: statusMap.processing || 0,
-      errorDocs: statusMap.error || 0,
-      totalChunks: documents.reduce((s, d) => s + d.chunkCount, 0),
-      totalSizeBytes: documents.reduce((s, d) => s + d.size, 0),
+    summary: {
+      totalDocuments:   docs.length,
       totalCollections: collections.length,
-      storageMode: usingPostgres() ? 'postgres' : 'local',
-      aiEnabled: Boolean(process.env.GEMINI_API_KEY),
+      totalChunks,
+      totalSize:        formatBytes(totalSize),
+      totalSizeBytes:   totalSize,
+      readyCount:       readyDocs.length,
+      errorCount:       errorDocs.length,
+      processingCount:  processDocs.length,
+      aiConnected:      Boolean(process.env.AI_API_KEY),
+      dbConnected:      Boolean(process.env.DATABASE_URL),
     },
-    collectionStats: Array.from(colMap.values()),
     typeBreakdown,
-    statusBreakdown: Object.entries(statusMap).map(([status, count]) => ({ status, count })),
-    recent,
+    collectionStats: colStats,
+    recentDocuments: recent,
   });
 }

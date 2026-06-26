@@ -1,54 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireCurrentUser } from '@/lib/auth';
 import { getDocuments, getCollections } from '@/lib/store';
+import { formatBytes } from '@/lib/utils';
 
 export async function GET(req: NextRequest) {
   const user = await requireCurrentUser(req).catch(() => null);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const [documents, collections] = await Promise.all([
-    getDocuments(user.id),
-    getCollections(user.id),
-  ]);
+  const [cols, docs] = await Promise.all([getCollections(user.id), getDocuments(user.id)]);
 
-  const report = collections.map((col) => {
-    const docs = documents.filter((d) => d.collectionId === col.id);
+  const report = cols.map((col) => {
+    const colDocs = docs.filter((d) => d.collectionId === col.id);
     return {
-      id: col.id,
-      name: col.name,
-      description: col.description || '',
-      createdAt: col.createdAt,
-      stats: {
-        totalDocuments: docs.length,
-        readyDocuments: docs.filter((d) => d.status === 'ready').length,
-        errorDocuments: docs.filter((d) => d.status === 'error').length,
-        totalChunks: docs.reduce((s, d) => s + d.chunkCount, 0),
-        totalSizeBytes: docs.reduce((s, d) => s + d.size, 0),
-      },
-      documents: docs.map((d) => ({
-        id: d.id,
-        name: d.name,
-        type: d.type,
-        sizeBytes: d.size,
-        chunks: d.chunkCount,
-        status: d.status,
+      id:          col.id,
+      name:        col.name,
+      description: col.description,
+      createdAt:   col.createdAt,
+      documents:   colDocs.map((d) => ({
+        id:        d.id,
+        name:      d.name,
+        type:      d.type,
+        size:      formatBytes(d.size),
+        chunks:    d.chunkCount,
+        status:    d.status,
         createdAt: d.createdAt,
       })),
+      stats: {
+        totalDocuments: colDocs.length,
+        totalSize:      formatBytes(colDocs.reduce((s, d) => s + d.size, 0)),
+        totalChunks:    colDocs.reduce((s, d) => s + d.chunkCount, 0),
+      },
     };
   });
 
-  const payload = {
-    exportedAt: new Date().toISOString(),
-    userEmail: user.email,
-    totalCollections: collections.length,
-    totalDocuments: documents.length,
-    totalChunks: documents.reduce((s, d) => s + d.chunkCount, 0),
-    collections: report,
-  };
-
-  return NextResponse.json(payload, {
+  return new NextResponse(JSON.stringify(report, null, 2), {
     headers: {
-      'Content-Disposition': `attachment; filename="documind-collections-${Date.now()}.json"`,
+      'Content-Type':        'application/json',
+      'Content-Disposition': 'attachment; filename="collections.json"',
     },
   });
 }

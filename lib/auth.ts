@@ -1,98 +1,81 @@
-import { createHmac, timingSafeEqual } from 'crypto';
-import { User } from './types';
-import { getStorage } from './storage';
+import { createHmac, randomBytes, timingSafeEqual, createHash } from 'crypto';
+import { cookies } from 'next/headers';
+import { NextRequest } from 'next/server';
+import { getUser } from '@/lib/store';
 
-export const SESSION_COOKIE = 'documind_session';
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+const SECRET = process.env.AUTH_SECRET || 'dev-secret-change-in-production';
+const COOKIE  = 'dm_session';
+const MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
-interface SessionPayload {
-  userId: string;
-  expiresAt: number;
+function sign(payload: string): string {
+  const sig = createHmac('sha256', SECRET).update(payload).digest('base64url');
+  return `${payload}.${sig}`;
 }
 
-export class AuthError extends Error {
-  status = 401;
-
-  constructor(message = 'Authentication required') {
-    super(message);
-  }
-}
-
-function getAuthSecret(): string {
-  const secret = process.env.AUTH_SECRET;
-  if (secret) return secret;
-  if (process.env.NODE_ENV !== 'production') return 'documind-dev-session-secret';
-  throw new Error('AUTH_SECRET is required in production');
-}
-
-function encodeJson(value: unknown): string {
-  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
-}
-
-function decodeJson<T>(value: string): T | null {
+function verify(token: string): string | null {
+  const last = token.lastIndexOf('.');
+  if (last < 0) return null;
+  const payload = token.slice(0, last);
+  const sig     = token.slice(last + 1);
+  const expected = createHmac('sha256', SECRET).update(payload).digest('base64url');
   try {
-    return JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as T;
+    if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
   } catch {
     return null;
   }
+  return payload;
 }
 
-function sign(value: string): string {
-  return createHmac('sha256', getAuthSecret()).update(value).digest('base64url');
+export async function hashPassword(pw: string): Promise<string> {
+  const salt = randomBytes(16).toString('hex');
+  const hash = createHash('sha256').update(salt + pw).digest('hex');
+  return `${salt}:${hash}`;
 }
 
-function safeEqual(a: string, b: string): boolean {
-  const left = Buffer.from(a);
-  const right = Buffer.from(b);
-  return left.length === right.length && timingSafeEqual(left, right);
+export async function verifyPassword(pw: string, stored: string): Promise<boolean> {
+  const [salt, hash] = stored.split(':');
+  const attempt = createHash('sha256').update(salt + pw).digest('hex');
+  try {
+    return timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(attempt, 'hex'));
+  } catch {
+    return false;
+  }
 }
 
-function readCookie(req: Request, name: string): string | null {
-  const header = req.headers.get('cookie') || '';
-  const cookies = header.split(';').map((part) => part.trim());
-  const match = cookies.find((part) => part.startsWith(`${name}=`));
-  if (!match) return null;
-  return decodeURIComponent(match.slice(name.length + 1));
-}
-
-export function createSessionToken(userId: string): string {
-  const payload = encodeJson({
-    userId,
-    expiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
-  } satisfies SessionPayload);
-  return `${payload}.${sign(payload)}`;
-}
-
-export function verifySessionToken(token: string | null): SessionPayload | null {
-  if (!token) return null;
-  const [payload, signature] = token.split('.');
-  if (!payload || !signature || !safeEqual(sign(payload), signature)) return null;
-
-  const session = decodeJson<SessionPayload>(payload);
-  if (!session || !session.userId || session.expiresAt < Date.now()) return null;
-  return session;
-}
-
-export function getSessionCookieOptions() {
-  return {
-    name: SESSION_COOKIE,
-    maxAge: SESSION_MAX_AGE_SECONDS,
+export async function createSession(userId: string): Promise<void> {
+  const token = sign(`${userId}:${Date.now()}`);
+  const jar   = await cookies();
+  jar.set(COOKIE, token, {
     httpOnly: true,
-    sameSite: 'lax' as const,
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-  };
+    secure:   process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge:   MAX_AGE,
+    path:     '/',
+  });
 }
 
-export async function getCurrentUser(req: Request): Promise<User | null> {
-  const token = readCookie(req, SESSION_COOKIE);
-  const session = verifySessionToken(token);
-  if (!session) return null;
-  return getStorage().getUserById(session.userId);
+export async function destroySession(): Promise<void> {
+  const jar = await cookies();
+  jar.delete(COOKIE);
 }
 
-export async function requireCurrentUser(req: Request): Promise<User> {
+export async function getCurrentUser(req?: NextRequest) {
+  let token: string | undefined;
+  if (req) {
+    token = req.cookies.get(COOKIE)?.value;
+  } else {
+    const jar = await cookies();
+    token = jar.get(COOKIE)?.value;
+  }
+  if (!token) return null;
+  const payload = verify(token);
+  if (!payload) return null;
+  const userId = payload.split(':')[0];
+  return getUser(userId);
+}
+
+export async function requireCurrentUser(req?: NextRequest) {
   const user = await getCurrentUser(req);
-  if (!user) throw new AuthError();
+  if (!user) throw new Error('Unauthorized');
   return user;
 }

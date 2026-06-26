@@ -1,9 +1,12 @@
-import { Loader2 } from 'lucide-react';
-
-export default function RootLoading() {
+export default function Loading() {
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
-      <Loader2 className="w-6 h-6 text-accent animate-spin" />
+    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
+      <div className="flex gap-1.5">
+        {[0,1,2].map((i) => (
+          <span key={i} className="w-2 h-2 rounded-full bg-blue-400 animate-bounce"
+            style={{ animationDelay: `${i * 150}ms` }} />
+        ))}
+      </div>
     </div>
   );
 }

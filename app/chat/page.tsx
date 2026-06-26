@@ -1,278 +1,296 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
-import ReactMarkdown from 'react-markdown';
-import { motion } from 'framer-motion';
-import {
-  Send, Sparkles, Loader2, Copy, CheckCheck,
-  Trash2, Download, RefreshCw, RotateCcw,
-} from 'lucide-react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import AuthGate from '@/components/app/AuthGate';
+import Citations from '@/components/app/Citations';
+import CollectionPicker from '@/components/app/CollectionPicker';
+import { useCollections } from '@/lib/use-collections';
 import { ChatMessage, Citation } from '@/lib/types';
 import { generateId } from '@/lib/utils';
-import { useCollections } from '@/lib/use-collections';
-import AuthGate from '@/components/app/AuthGate';
-import CollectionPicker from '@/components/app/CollectionPicker';
-import Citations from '@/components/app/Citations';
+import { toast } from '@/components/app/Toast';
+import {
+  Send, StopCircle, Trash2, Download, Copy, CheckCheck,
+  RotateCcw, MessageSquare, Sparkles, AlertTriangle, Bot,
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-function CopyButton({ text }: { text: string }) {
+function UserAvatar({ name }: { name?: string }) {
+  const initials = name?.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2) ?? 'U';
+  return (
+    <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center shrink-0">
+      <span className="text-[10px] font-bold text-blue-400">{initials}</span>
+    </div>
+  );
+}
+
+function BotAvatar() {
+  return (
+    <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+      <Bot className="w-3.5 h-3.5 text-emerald-400" />
+    </div>
+  );
+}
+
+function CopyBtn({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
-    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /**/ }
   };
   return (
-    <button onClick={copy} title="Copy message"
-      className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg text-text-muted hover:text-text-secondary hover:bg-white/5">
+    <button onClick={copy} title="Copy"
+      className="p-1.5 rounded-md text-text-muted hover:text-text-secondary hover:bg-white/5 transition-colors opacity-0 group-hover:opacity-100">
       {copied ? <CheckCheck className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
     </button>
   );
 }
 
-const QUICK_PROMPTS = [
-  'Summarize the key points across all documents.',
-  'What risks, deadlines, or action items should I know about?',
-  'Create a structured action list with citations.',
-  'Compare and contrast the main themes in these documents.',
-];
-
 export default function ChatPage() {
+  return <AuthGate><ChatInner /></AuthGate>;
+}
+
+function ChatInner() {
   const { collections } = useCollections();
-  const [collectionId, setCollectionId] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [messages,      setMessages]      = useState<ChatMessage[]>([]);
+  const [input,         setInput]         = useState('');
+  const [busy,          setBusy]          = useState(false);
+  const [collectionId,  setCollectionId]  = useState<string | undefined>();
+  const [sessionTitle,  setSessionTitle]  = useState('New Chat');
+  const [wordCount,     setWordCount]     = useState(0);
+  const bottomRef  = useRef<HTMLDivElement>(null);
+  const abortRef   = useRef<AbortController | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get('collectionId');
-    if (id) setCollectionId(id);
-  }, []);
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-  const scrollToBottom = useCallback(() => {
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-    });
-  }, []);
+  useEffect(() => {
+    const wc = messages
+      .filter((m) => m.role === 'assistant')
+      .reduce((s, m) => s + m.content.split(/\s+/).length, 0);
+    setWordCount(wc);
+  }, [messages]);
 
-  const send = useCallback(async (question?: string) => {
-    const q = (question ?? input).trim();
-    if (!q || busy) return;
-
-    const userMsg: ChatMessage = { id: generateId(), role: 'user', content: q, createdAt: new Date().toISOString() };
-    const asstId = generateId();
-    const asstMsg: ChatMessage = { id: asstId, role: 'assistant', content: '', citations: [], createdAt: new Date().toISOString() };
-
-    setMessages((m) => [...m, userMsg, asstMsg]);
+  const submit = useCallback(async (question: string) => {
+    if (!question.trim() || busy) return;
+    const userMsg: ChatMessage = { id: generateId(), role: 'user', content: question.trim(), createdAt: new Date().toISOString() };
+    setMessages((p) => [...p, userMsg]);
     setInput('');
     setBusy(true);
-    scrollToBottom();
+    if (messages.length === 0) setSessionTitle(question.slice(0, 48));
+
+    const assistantId = generateId();
+    setMessages((p) => [...p, { id: assistantId, role: 'assistant', content: '', createdAt: new Date().toISOString() }]);
+
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
 
     try {
       const res = await fetch('/api/chat', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q, collectionId: collectionId || undefined }),
+        signal:  ctrl.signal,
+        body:    JSON.stringify({ question: question.trim(), collectionId, topK: 6 }),
       });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `${res.status}`);
-      if (!res.body) throw new Error('No stream');
+      if (!res.ok || !res.body) throw new Error(`Request failed (${res.status})`);
 
       const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = ''; let headerParsed = false; let citations: Citation[] = []; let answer = '';
+      const dec    = new TextDecoder();
+      let   first  = true;
+      let   citations: Citation[] = [];
+      let   buf    = '';
 
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        if (!headerParsed) {
+        buf += dec.decode(value, { stream: true });
+
+        if (first) {
           const nl = buf.indexOf('\n');
-          if (nl !== -1) {
-            try { citations = JSON.parse(buf.slice(0, nl)).citations || []; } catch { citations = []; }
-            buf = buf.slice(nl + 1);
-            headerParsed = true;
-            setMessages((m) => m.map((msg) => msg.id === asstId ? { ...msg, citations } : msg));
+          if (nl >= 0) {
+            try { const hdr = JSON.parse(buf.slice(0, nl)); citations = hdr.citations ?? []; } catch { /**/ }
+            buf   = buf.slice(nl + 1);
+            first = false;
           }
         }
-        if (headerParsed) {
-          answer += buf; buf = '';
-          setMessages((m) => m.map((msg) => msg.id === asstId ? { ...msg, content: answer } : msg));
-          scrollToBottom();
-        }
+
+        setMessages((p) =>
+          p.map((m) => m.id === assistantId ? { ...m, content: m.content + buf, citations } : m)
+        );
+        buf = '';
       }
+
+      setMessages((p) =>
+        p.map((m) => m.id === assistantId ? { ...m, citations } : m)
+      );
     } catch (err) {
-      setMessages((m) => m.map((msg) =>
-        msg.id === asstId ? { ...msg, content: `⚠️ ${err instanceof Error ? err.message : 'Request failed'}` } : msg,
-      ));
+      if ((err as Error).name === 'AbortError') return;
+      const msg = err instanceof Error ? err.message : 'Something went wrong.';
+      setMessages((p) =>
+        p.map((m) => m.id === assistantId ? { ...m, content: `⚠️ ${msg}` } : m)
+      );
+      toast.error(msg);
     } finally {
       setBusy(false);
-      scrollToBottom();
+      abortRef.current = null;
     }
-  }, [input, collectionId, busy, scrollToBottom]);
+  }, [busy, collectionId, messages.length]);
 
-  const clearChat = () => setMessages([]);
-
-  const exportChat = async () => {
-    if (!messages.length) return;
-    setExporting(true);
-    try {
-      const colName = collections.find((c) => c.id === collectionId)?.name || 'All collections';
-      const res = await fetch('/api/export/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, collectionName: colName }),
-      });
-      if (!res.ok) throw new Error(`${res.status}`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = `chat-export-${Date.now()}.md`; a.click();
-      URL.revokeObjectURL(url);
-    } catch {}
-    finally { setExporting(false); }
+  const handleSubmit = (e: FormEvent) => { e.preventDefault(); submit(input); };
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(input); }
+  };
+  const stop      = () => { abortRef.current?.abort(); setBusy(false); };
+  const clearChat = () => { setMessages([]); setSessionTitle('New Chat'); setWordCount(0); };
+  const retry     = (idx: number) => {
+    const prev = messages[idx - 1];
+    if (prev?.role === 'user') { setMessages((p) => p.slice(0, idx - 1)); submit(prev.content); }
   };
 
-  const wordCount = useMemo(() =>
-    messages.filter((m) => m.role === 'assistant').reduce((n, m) => n + m.content.split(/\s+/).filter(Boolean).length, 0),
-  [messages]);
+  const exportChat = async () => {
+    const res = await fetch('/api/export/chat', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ messages, title: sessionTitle }),
+    });
+    if (!res.ok) { toast.error('Export failed'); return; }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url; a.download = `${sessionTitle.replace(/\s+/g, '-')}.md`;
+    a.click(); URL.revokeObjectURL(url);
+    toast.success('Chat exported');
+  };
 
   return (
-    <AuthGate>
-      <div className="flex flex-col h-[calc(100vh-4rem)]">
-
-        {/* Header */}
-        <div className="border-b border-border px-4 sm:px-6 py-3 flex items-center gap-3 flex-wrap">
-          <h1 className="font-semibold flex items-center gap-2 text-sm">
-            <Sparkles className="w-4 h-4 text-accent" />Chat
-          </h1>
-          <div className="flex-1" />
-          <CollectionPicker collections={collections} value={collectionId} onChange={setCollectionId} includeAll />
-          {messages.length > 0 && (
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] text-text-muted hidden sm:block font-mono">
-                {messages.length} msgs · {wordCount} words
-              </span>
-              <button
-                onClick={exportChat}
-                disabled={exporting}
-                title="Export chat as Markdown"
-                className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-border bg-bg-card text-xs text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
-              >
-                {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                <span className="hidden sm:inline">Export</span>
-              </button>
-              <button
-                onClick={clearChat}
-                title="Clear conversation"
-                className="h-8 w-8 rounded-lg border border-border bg-bg-card text-xs text-text-secondary hover:text-danger hover:border-danger/30 hover:bg-danger/10 transition-colors flex items-center justify-center"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-6">
-          <div className="max-w-3xl mx-auto space-y-5">
-
-            {messages.length === 0 && (
-              <div className="text-center py-16">
-                <div className="w-14 h-14 rounded-2xl bg-accent-soft border border-accent/20 flex items-center justify-center mx-auto mb-4">
-                  <Sparkles className="w-6 h-6 text-accent" />
-                </div>
-                <h2 className="text-lg font-semibold mb-2">Ask anything about your documents</h2>
-                <p className="text-sm text-text-muted max-w-sm mx-auto mb-6">
-                  Upload files in{' '}
-                  <Link href="/documents" className="text-accent hover:underline">Documents</Link> first,
-                  then ask questions here. Answers come with inline citations.
-                </p>
-                <div className="mx-auto grid max-w-2xl gap-2 sm:grid-cols-2">
-                  {QUICK_PROMPTS.map((prompt) => (
-                    <button key={prompt} onClick={() => send(prompt)}
-                      className="rounded-xl border border-border bg-bg-card px-4 py-3 text-left text-xs text-text-secondary hover:border-accent/40 hover:text-text-primary transition-colors">
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {messages.map((msg) => (
-              <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                className={`flex group ${msg.role === 'user' ? 'justify-end' : 'justify-start'} gap-2`}>
-                {msg.role === 'assistant' && (
-                  <div className="w-7 h-7 rounded-lg bg-accent-soft border border-accent/20 flex items-center justify-center shrink-0 mt-0.5">
-                    <Sparkles className="w-3.5 h-3.5 text-accent" />
-                  </div>
-                )}
-                <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${msg.role === 'user' ? 'bg-accent text-white' : 'glass'}`}>
-                  {msg.role === 'assistant' && !msg.content && busy ? (
-                    <span className="flex items-center gap-2 text-text-muted text-sm">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Thinking…
-                    </span>
-                  ) : msg.role === 'assistant' ? (
-                    <div className="prose-sm text-sm leading-relaxed [&_p]:mb-2 [&_code]:text-accent-2 [&_strong]:text-text-primary">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
-                    </div>
-                  ) : (
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                  )}
-                  {msg.role === 'assistant' && msg.citations && (
-                    <Citations citations={msg.citations} />
-                  )}
-                </div>
-                <CopyButton text={msg.content} />
-                {msg.role === 'user' && (
-                  <button onClick={() => send(msg.content)} title="Retry this prompt"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg text-text-muted hover:text-text-secondary hover:bg-white/5 shrink-0">
-                    <RotateCcw className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </motion.div>
-            ))}
+    <div className="flex flex-col h-[calc(100vh-4rem)] lg:h-[calc(100vh-4rem)]">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-bg-secondary/50 backdrop-blur-sm shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <MessageSquare className="w-4 h-4 text-blue-400 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-text-primary truncate">{sessionTitle}</p>
+            <p className="text-xs text-text-muted">
+              {messages.length} msg{messages.length !== 1 ? 's' : ''} · {wordCount} words
+            </p>
           </div>
         </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <CollectionPicker collections={collections} value={collectionId} onChange={setCollectionId} placeholder="All docs" />
+          {messages.length > 0 && (
+            <>
+              <button onClick={exportChat} title="Export as Markdown"
+                className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors">
+                <Download className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={clearChat} title="Clear chat"
+                className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-text-muted hover:text-danger hover:bg-danger/10 transition-colors">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
 
-        {/* Composer */}
-        <div className="border-t border-border px-4 sm:px-6 py-4">
-          <div className="max-w-3xl mx-auto space-y-2">
-            {messages.length === 0 && (
-              <div className="flex gap-1.5 overflow-x-auto pb-1">
-                {QUICK_PROMPTS.slice(0,3).map((p) => (
-                  <button key={p} onClick={() => send(p)}
-                    className="whitespace-nowrap shrink-0 text-[11px] px-3 py-1.5 rounded-full border border-border bg-bg-card text-text-muted hover:text-text-secondary hover:border-accent/30 transition-colors">
-                    {p.slice(0, 36)}…
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-center gap-5 pb-8">
+            <div className="w-14 h-14 rounded-2xl bg-blue-600/15 border border-blue-500/25 flex items-center justify-center">
+              <Sparkles className="w-7 h-7 text-blue-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold mb-1.5">Ask your documents anything</h2>
+              <p className="text-sm text-text-muted max-w-sm">
+                Questions are answered from your uploaded documents with precise source citations.
+              </p>
+            </div>
+            {collections.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-lg mt-2">
+                {['Summarize the key points', 'What are the main risks?', 'List all dates mentioned', 'Compare these documents'].map((s) => (
+                  <button key={s} onClick={() => submit(s)}
+                    className="text-left px-4 py-3 rounded-xl border border-border bg-bg-card hover:border-blue-500/30 hover:bg-blue-500/5 transition-colors text-xs text-text-secondary font-medium">
+                    {s}
                   </button>
                 ))}
               </div>
             )}
-            <div className="flex items-end gap-2">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                rows={1}
-                placeholder="Ask a question about your documents… (Enter to send, Shift+Enter for newline)"
-                className="flex-1 resize-none bg-bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-accent/40 max-h-40"
-              />
-              {busy && (
-                <button onClick={() => setBusy(false)} title="Stop generation"
-                  className="shrink-0 w-11 h-11 rounded-xl border border-border bg-bg-card text-text-muted hover:text-danger flex items-center justify-center transition-colors">
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              )}
-              <button onClick={() => send()} disabled={busy || !input.trim()}
-                className="shrink-0 w-11 h-11 rounded-xl bg-accent text-white flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed">
-                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </button>
-            </div>
-            <p className="text-[10px] text-text-muted text-center">
-              Answers are grounded in your documents · citations expand below each response
-            </p>
           </div>
-        </div>
+        )}
+
+        <AnimatePresence initial={false}>
+          {messages.map((msg, i) => (
+            <motion.div key={msg.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`flex gap-3 group ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {msg.role === 'assistant' && <BotAvatar />}
+              <div className={`max-w-[85%] ${msg.role === 'user' ? 'order-first' : ''}`}>
+                <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed prose-dm ${
+                  msg.role === 'user'
+                    ? 'bg-blue-600/15 border border-blue-500/25 text-text-primary'
+                    : 'bg-bg-card border border-border text-text-primary'
+                }`}>
+                  {msg.content || (busy && msg.role === 'assistant' ? (
+                    <span className="flex items-center gap-1.5 text-text-muted">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </span>
+                  ) : null)}
+                  {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && (
+                    <Citations citations={msg.citations} />
+                  )}
+                </div>
+                <div className="flex items-center gap-1 mt-1 px-1">
+                  <span className="text-[10px] text-text-muted">{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  {msg.role === 'assistant' && <CopyBtn text={msg.content} />}
+                  {msg.role === 'assistant' && i > 0 && (
+                    <button onClick={() => retry(i)} title="Retry"
+                      className="p-1.5 rounded-md text-text-muted hover:text-text-secondary hover:bg-white/5 transition-colors opacity-0 group-hover:opacity-100">
+                      <RotateCcw className="w-3 h-3" />
+                    </button>
+                  )}
+                  {msg.content.includes('⚠️') && (
+                    <AlertTriangle className="w-3 h-3 text-warning" />
+                  )}
+                </div>
+              </div>
+              {msg.role === 'user' && <UserAvatar />}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+        <div ref={bottomRef} />
       </div>
-    </AuthGate>
+
+      {/* Input */}
+      <div className="shrink-0 px-4 py-3 border-t border-border bg-bg-secondary/50 backdrop-blur-sm">
+        <p className="text-center text-xs text-text-muted mb-2">
+          Answers are grounded in your documents — citations expand below each response
+        </p>
+        <form onSubmit={handleSubmit}>
+          <div className="flex items-end gap-2.5 rounded-2xl border border-border bg-bg-card px-4 py-3 focus-within:border-blue-500/50 transition-colors">
+            <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask a question about your documents… (Enter to send, Shift+Enter for newline)"
+              rows={1}
+              className="flex-1 bg-transparent resize-none text-sm placeholder:text-text-muted focus:outline-none max-h-32 leading-relaxed"
+              style={{ height: 'auto', minHeight: '1.5rem' }}
+              onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = `${Math.min(t.scrollHeight, 128)}px`; }}
+            />
+            {busy
+              ? <button type="button" onClick={stop}
+                  className="h-9 w-9 flex items-center justify-center rounded-xl bg-danger/15 border border-danger/30 text-danger hover:bg-danger/25 transition-colors shrink-0">
+                  <StopCircle className="w-4 h-4" />
+                </button>
+              : <button type="submit" disabled={!input.trim()}
+                  className="h-9 w-9 flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors shrink-0">
+                  <Send className="w-4 h-4" />
+                </button>
+            }
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

@@ -1,53 +1,74 @@
-// Thin facade over the selected storage adapter (JSON or Postgres+pgvector).
-//
-// All operations are scoped by userId. Routes call these helpers; the adapter
-// is chosen automatically based on whether DATABASE_URL is configured.
+/**
+ * Unified data store — uses Postgres+pgvector when DATABASE_URL is set,
+ * otherwise falls back to local JSON files (dev / demo mode).
+ */
 
-import { Chunk, Citation, Collection, DocumentMeta } from './types';
-import { getStorage } from './storage';
+import { Collection, Chunk, DocumentMeta, User } from '@/lib/types';
+
+const USE_PG = Boolean(process.env.DATABASE_URL);
+
+/* ─── Lazy load the right adapter ─────────────────────────────────────────── */
+async function adapter() {
+  if (USE_PG) {
+    return import('@/lib/db-postgres');
+  }
+  return import('@/lib/db-json');
+}
+
+/* ─── Public API ─────────────────────────────────────────────────────────── */
+
+export async function getUser(id: string): Promise<User | null> {
+  return (await adapter()).getUser(id);
+}
+export async function getUserByEmail(email: string): Promise<User | null> {
+  return (await adapter()).getUserByEmail(email);
+}
+export async function saveUser(user: User): Promise<void> {
+  return (await adapter()).saveUser(user);
+}
+export async function updateUser(id: string, patch: Partial<User>): Promise<void> {
+  return (await adapter()).updateUser(id, patch);
+}
 
 export async function getCollections(userId: string): Promise<Collection[]> {
-  return getStorage().getCollections(userId);
+  return (await adapter()).getCollections(userId);
+}
+export async function getCollection(id: string): Promise<Collection | null> {
+  return (await adapter()).getCollection(id);
+}
+export async function saveCollection(col: Collection): Promise<void> {
+  return (await adapter()).saveCollection(col);
+}
+export async function updateCollection(id: string, patch: Partial<Collection>): Promise<void> {
+  return (await adapter()).updateCollection(id, patch);
+}
+export async function deleteCollection(id: string): Promise<void> {
+  return (await adapter()).deleteCollection(id);
 }
 
-export async function createCollection(c: Collection): Promise<Collection> {
-  return getStorage().createCollection(c);
+export async function getDocuments(userId: string, collectionId?: string): Promise<DocumentMeta[]> {
+  return (await adapter()).getDocuments(userId, collectionId);
 }
-
-export async function deleteCollection(userId: string, id: string): Promise<void> {
-  return getStorage().deleteCollection(userId, id);
+export async function getDocument(id: string): Promise<DocumentMeta | null> {
+  return (await adapter()).getDocument(id);
 }
-
-export async function getDocuments(
-  userId: string,
-  collectionId?: string,
-): Promise<DocumentMeta[]> {
-  return getStorage().getDocuments(userId, collectionId);
-}
-
 export async function saveDocument(doc: DocumentMeta): Promise<void> {
-  return getStorage().saveDocument(doc);
+  return (await adapter()).saveDocument(doc);
 }
-
-export async function deleteDocument(userId: string, id: string): Promise<void> {
-  return getStorage().deleteDocument(userId, id);
+export async function deleteDocument(id: string): Promise<void> {
+  return (await adapter()).deleteDocument(id);
 }
 
 export async function addChunks(chunks: Chunk[]): Promise<void> {
-  return getStorage().addChunks(chunks);
+  return (await adapter()).addChunks(chunks);
+}
+export async function deleteChunks(documentId: string): Promise<void> {
+  return (await adapter()).deleteChunks(documentId);
 }
 
 export async function search(
   queryEmbedding: number[],
   opts: { userId: string; collectionId?: string; topK?: number },
-): Promise<Citation[]> {
-  return getStorage().search(queryEmbedding, opts);
-}
-
-export async function updateCollection(
-  userId: string,
-  id: string,
-  patch: Partial<Pick<import('./types').Collection, 'name' | 'description'>>,
-): Promise<import('./types').Collection | null> {
-  return getStorage().updateCollection(userId, id, patch);
+) {
+  return (await adapter()).search(queryEmbedding, opts);
 }

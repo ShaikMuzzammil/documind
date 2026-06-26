@@ -1,10 +1,18 @@
-// Shared domain types for DocuMind.
-
 export interface User {
   id: string;
-  email: string;
   name: string;
+  email: string;
+  passwordHash: string;
   createdAt: string;
+}
+
+export interface Collection {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DocumentMeta {
@@ -20,32 +28,24 @@ export interface DocumentMeta {
   createdAt: string;
 }
 
-export interface Collection {
-  id: string;
-  userId: string;
-  name: string;
-  description?: string;
-  createdAt: string;
-}
-
 export interface Chunk {
   id: string;
-  userId: string;
   documentId: string;
+  userId: string;
   collectionId: string;
-  index: number;
   text: string;
   embedding: number[];
+  index: number;
 }
 
-/** A retrieved chunk plus its similarity score, used as a citation. */
 export interface Citation {
   chunkId: string;
   documentId: string;
   documentName: string;
-  index: number;
   text: string;
   score: number;
+  index: number;
+  page?: number;
 }
 
 export interface ChatMessage {
@@ -54,4 +54,18 @@ export interface ChatMessage {
   content: string;
   citations?: Citation[];
   createdAt: string;
+}
+
+export interface SchemaField {
+  key: string;
+  type: 'string' | 'number' | 'boolean' | 'date';
+  description?: string;
+}
+
+export interface UserSettings {
+  responseStyle: 'concise' | 'balanced' | 'detailed';
+  citationCount: number;
+  defaultCollection?: string;
+  itemsPerPage: number;
+  emailNotifications: boolean;
 }

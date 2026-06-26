@@ -2,37 +2,38 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { BrainCircuit, LogOut, UserRound, Menu, X, Sparkles, Settings } from 'lucide-react';
+import { BookOpen, LogOut, UserRound, Menu, X, Sparkles, Home } from 'lucide-react';
 import { useUser } from '@/lib/use-user';
 
 const HOME_SECTIONS = [
-  { id: 'how',     label: 'How it works' },
-  { id: 'features',label: 'Features'     },
-  { id: 'deploy',  label: 'Deploy'       },
-  { id: 'pricing', label: 'Pricing'      },
-  { id: 'faq',     label: 'FAQ'          },
+  { id: 'how',          label: 'How it Works'  },
+  { id: 'features',     label: 'Features'      },
+  { id: 'capabilities', label: 'Capabilities'  },
+  { id: 'guide',        label: 'Guide'         },
+  { id: 'faq',          label: 'FAQ'           },
 ];
 
 export default function Navigation() {
-  const pathname  = usePathname() || '/';
-  const isHome    = pathname === '/';
-  const [scrolled, setScrolled] = useState(false);
-  const [active,   setActive]   = useState('');
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, loading, refresh } = useUser();
+  const pathname    = usePathname() ?? '/';
+  const router      = useRouter();
+  const isHome      = pathname === '/';
+  const [scrolled,    setScrolled]    = useState(false);
+  const [active,      setActive]      = useState('');
+  const [mobileOpen,  setMobileOpen]  = useState(false);
+  const { user, loading, refresh }    = useUser();
 
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     await refresh();
-    window.location.href = '/auth';
+    router.replace('/auth');
   };
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 16);
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
+    const fn = () => setScrolled(window.scrollY > 16);
+    window.addEventListener('scroll', fn);
+    return () => window.removeEventListener('scroll', fn);
   }, []);
 
   useEffect(() => {
@@ -41,66 +42,84 @@ export default function Navigation() {
     if (!sections.length) return;
     const io = new IntersectionObserver(
       (entries) => {
-        const vis = entries.filter((e) => e.isIntersecting)
-          .sort((a,b) => b.intersectionRatio - a.intersectionRatio)[0];
+        const vis = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
         if (vis?.target.id) setActive(vis.target.id);
       },
-      { rootMargin: '-30% 0px -55% 0px', threshold: [0.15,0.4,0.7] },
+      { rootMargin: '-25% 0px -60% 0px', threshold: [0.1, 0.4, 0.7] },
     );
     sections.forEach((s) => io.observe(s));
     return () => io.disconnect();
-  }, [isHome]);
+  }, [isHome, pathname]);
+
+  const isApp = !isHome && pathname !== '/auth';
 
   return (
     <motion.nav
-      initial={{ y: -80, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.4, ease: [0.22,1,0.36,1] }}
-      className={`fixed top-0 inset-x-0 z-50 transition-all duration-200 ${scrolled ? 'glass border-b border-border' : 'bg-transparent'}`}
+      initial={{ y: -72, opacity: 0 }}
+      animate={{ y: 0,   opacity: 1 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className={`fixed top-0 inset-x-0 z-50 transition-all duration-200 ${
+        scrolled || isApp ? 'glass border-b border-border' : 'bg-transparent'
+      }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          <div className="w-7 h-7 rounded-lg bg-violet-500/15 border border-violet-500/30 flex items-center justify-center">
-            <BrainCircuit className="w-4 h-4 text-violet-400" />
+        <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
+          <div className="w-8 h-8 rounded-xl bg-blue-600/15 border border-blue-500/30 flex items-center justify-center group-hover:bg-blue-600/25 transition-colors">
+            <BookOpen className="w-4 h-4 text-blue-400" />
           </div>
-          <span className="font-bold tracking-tight text-sm">Docu<span className="gradient-text">Mind</span></span>
+          <span className="font-bold tracking-tight text-sm">
+            Docu<span className="gradient-text">Mind</span>
+          </span>
         </Link>
 
-        {/* Desktop nav (home only) */}
+        {/* Desktop home nav */}
         {isHome && (
-          <div className="hidden md:flex items-center gap-0.5">
+          <nav className="hidden md:flex items-center gap-0.5">
             {HOME_SECTIONS.map((s) => (
               <a key={s.id} href={`#${s.id}`}
-                className={`px-3 py-2 text-xs rounded-lg transition-colors ${active === s.id ? 'text-violet-400 bg-violet-500/10' : 'text-text-secondary hover:text-text-primary hover:bg-white/5'}`}>
+                className={`px-3 py-2 text-xs rounded-lg transition-colors ${
+                  active === s.id
+                    ? 'text-blue-400 bg-blue-500/10 font-medium'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                }`}>
                 {s.label}
               </a>
             ))}
-          </div>
+          </nav>
         )}
 
-        {/* Right */}
+        {/* App breadcrumb home link */}
+        {isApp && (
+          <Link href="/"
+            className="hidden md:flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5">
+            <Home className="w-3.5 h-3.5" />Home
+          </Link>
+        )}
+
+        {/* Right actions */}
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              <Link href="/chat"
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-accent hover:opacity-90 px-4 py-2 text-xs font-semibold text-white transition-opacity">
-                <Sparkles className="w-3.5 h-3.5" />Open app
-              </Link>
-              <Link href="/settings" title="Settings"
-                className="hidden sm:inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-bg-card text-text-muted hover:text-text-primary transition-colors">
-                <Settings className="h-3.5 w-3.5" />
-              </Link>
+              {isHome && (
+                <Link href="/chat"
+                  className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-semibold text-white transition-colors">
+                  <Sparkles className="w-3.5 h-3.5" />Open Workspace
+                </Link>
+              )}
               <button onClick={logout}
                 className="hidden sm:inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-bg-card px-3 text-xs text-text-secondary transition-colors hover:text-text-primary"
                 title={`Signed in as ${user.email}`}>
-                <LogOut className="h-3.5 w-3.5" />Logout
+                <LogOut className="h-3.5 w-3.5" />Sign out
               </button>
             </>
           ) : (
             <Link href="/auth"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-accent hover:opacity-90 px-4 py-2 text-xs font-semibold text-white transition-opacity">
-              {loading ? 'Loading…' : 'Sign in'}<UserRound className="h-3.5 w-3.5" />
+              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-semibold text-white transition-colors">
+              {loading ? 'Loading…' : 'Sign in'} <UserRound className="h-3.5 w-3.5" />
             </Link>
           )}
 
@@ -116,8 +135,10 @@ export default function Navigation() {
 
       {/* Mobile menu */}
       {isHome && mobileOpen && (
-        <motion.div initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }}
-          exit={{ opacity:0, height:0 }}
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
           className="md:hidden border-t border-border glass px-4 py-3 flex flex-col gap-1">
           {HOME_SECTIONS.map((s) => (
             <a key={s.id} href={`#${s.id}`} onClick={() => setMobileOpen(false)}
@@ -127,11 +148,11 @@ export default function Navigation() {
           ))}
           {user
             ? <Link href="/chat" onClick={() => setMobileOpen(false)}
-                className="mt-1 inline-flex items-center gap-1.5 justify-center rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white">
-                <Sparkles className="w-4 h-4" />Open app
+                className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white">
+                <Sparkles className="w-4 h-4" />Open Workspace
               </Link>
             : <Link href="/auth" onClick={() => setMobileOpen(false)}
-                className="mt-1 inline-flex items-center gap-1.5 justify-center rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white">
+                className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white">
                 Sign in
               </Link>
           }

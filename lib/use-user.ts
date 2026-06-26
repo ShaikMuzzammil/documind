@@ -1,40 +1,43 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { User } from './types';
 
-interface MeResponse {
-  user: User;
-  capabilities: {
-    email: boolean;
-    postgres: boolean;
-    ai: boolean;
-  };
-}
+export interface MeUser { id: string; name: string; email: string; }
+
+let _cache: MeUser | null | undefined = undefined; // undefined = not yet fetched
+const listeners = new Set<() => void>();
+
+function notify() { listeners.forEach((fn) => fn()); }
 
 export function useUser() {
-  const [data, setData] = useState<MeResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user,    setUser]    = useState<MeUser | null | undefined>(_cache);
+  const [loading, setLoading] = useState(_cache === undefined);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/me');
-      if (!res.ok) {
-        setData(null);
-        return;
+      if (res.ok) {
+        const data = await res.json();
+        _cache = data.user ?? null;
+      } else {
+        _cache = null;
       }
-      setData(await res.json());
     } catch {
-      setData(null);
-    } finally {
-      setLoading(false);
+      _cache = null;
     }
+    setUser(_cache ?? null);
+    setLoading(false);
+    notify();
   }, []);
 
   useEffect(() => {
-    refresh();
+    const sync = () => setUser(_cache ?? null);
+    listeners.add(sync);
+    if (_cache === undefined) refresh();
+    else setLoading(false);
+    return () => { listeners.delete(sync); };
   }, [refresh]);
 
-  return { ...data, loading, refresh };
+  return { user: user ?? null, loading, refresh };
 }

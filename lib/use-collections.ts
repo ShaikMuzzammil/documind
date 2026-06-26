@@ -1,20 +1,23 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Collection } from './types';
+import { Collection } from '@/lib/types';
 
 export function useCollections() {
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState('');
 
   const refresh = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
       const res = await fetch('/api/collections');
+      if (!res.ok) throw new Error('Failed to load collections');
       const data = await res.json();
-      setCollections(data.collections || []);
-    } catch {
-      setCollections([]);
+      setCollections(data.collections ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
@@ -22,31 +25,5 @@ export function useCollections() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const create = useCallback(async (name: string, description?: string) => {
-    const res = await fetch('/api/collections', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, description }),
-    });
-    if (res.ok) await refresh();
-    return res.ok;
-  }, [refresh]);
-
-  const update = useCallback(async (id: string, patch: { name?: string; description?: string }) => {
-    const res = await fetch(`/api/collections/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    });
-    if (res.ok) await refresh();
-    return res.ok;
-  }, [refresh]);
-
-  const remove = useCallback(async (id: string) => {
-    const res = await fetch(`/api/collections/${id}`, { method: 'DELETE' });
-    if (res.ok) await refresh();
-    return res.ok;
-  }, [refresh]);
-
-  return { collections, loading, refresh, create, update, remove };
+  return { collections, loading, error, refresh };
 }
