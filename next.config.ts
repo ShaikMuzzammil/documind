@@ -1,9 +1,12 @@
 import type { NextConfig } from 'next';
 
-const nextConfig: NextConfig = {
-  serverExternalPackages: ['pdf-parse', 'pg'],
-  eslint: { ignoreDuringBuilds: false },
+const config: NextConfig = {
+  serverExternalPackages: ['pdf-parse','pg','@pg-native'],
+  eslint:     { ignoreDuringBuilds: false },
   typescript: { ignoreBuildErrors: false },
+  experimental: {
+    optimizePackageImports: ['lucide-react','recharts','framer-motion'],
+  },
 };
 
-export default nextConfig;
+export default config;

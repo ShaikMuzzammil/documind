@@ -5,14 +5,15 @@ import AppSidebar   from '@/components/shared/AppSidebar';
 import ToastProvider from '@/components/app/Toast';
 
 export const metadata: Metadata = {
-  title:       'DocuMind — Document Intelligence Platform',
-  description: 'Upload documents and query them with precision AI. Cited answers, analytics, batch extraction.',
-  icons: { icon: '/favicon.svg' },
+  title:       { default: 'DocuMind — Document Intelligence', template: '%s | DocuMind' },
+  description: 'Upload documents and query them with AI. Cited answers, analytics, schema extraction, and PII detection.',
+  icons:       { icon: '/favicon.svg' },
+  keywords:    ['document intelligence','RAG','AI chat','document search','semantic search'],
 };
 
 export const viewport: Viewport = {
-  themeColor: '#05080f',
-  width:      'device-width',
+  themeColor:   '#05080f',
+  width:        'device-width',
   initialScale: 1,
 };
 

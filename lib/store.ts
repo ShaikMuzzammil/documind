@@ -1,74 +1,41 @@
 /**
- * Unified data store — uses Postgres+pgvector when DATABASE_URL is set,
- * otherwise falls back to local JSON files (dev / demo mode).
+ * Unified store — delegates to Postgres+pgvector or local JSON file store.
+ * Uses static imports so Next.js tree-shakes correctly.
  */
-
-import { Collection, Chunk, DocumentMeta, User } from '@/lib/types';
+import type { Collection, Chunk, DocumentMeta, User } from '@/lib/types';
+import type { Citation } from '@/lib/types';
 
 const USE_PG = Boolean(process.env.DATABASE_URL);
 
-/* ─── Lazy load the right adapter ─────────────────────────────────────────── */
-async function adapter() {
-  if (USE_PG) {
-    return import('@/lib/db-postgres');
-  }
-  return import('@/lib/db-json');
-}
+async function pg()   { return import('@/lib/db-postgres'); }
+async function json() { return import('@/lib/db-json'); }
+const store = () => USE_PG ? pg() : json();
 
-/* ─── Public API ─────────────────────────────────────────────────────────── */
+/* Users */
+export const getUser         = async (id: string): Promise<User | null> => (await store()).getUser(id);
+export const getUserByEmail  = async (e: string): Promise<User | null> => (await store()).getUserByEmail(e);
+export const saveUser        = async (u: User):   Promise<void>         => (await store()).saveUser(u);
+export const updateUser      = async (id: string, patch: Partial<User>): Promise<void> => (await store()).updateUser(id, patch);
 
-export async function getUser(id: string): Promise<User | null> {
-  return (await adapter()).getUser(id);
-}
-export async function getUserByEmail(email: string): Promise<User | null> {
-  return (await adapter()).getUserByEmail(email);
-}
-export async function saveUser(user: User): Promise<void> {
-  return (await adapter()).saveUser(user);
-}
-export async function updateUser(id: string, patch: Partial<User>): Promise<void> {
-  return (await adapter()).updateUser(id, patch);
-}
+/* Collections */
+export const getCollections   = async (uid: string): Promise<Collection[]>    => (await store()).getCollections(uid);
+export const getCollection    = async (id: string):  Promise<Collection|null> => (await store()).getCollection(id);
+export const saveCollection   = async (c: Collection): Promise<void>          => (await store()).saveCollection(c);
+export const updateCollection = async (id: string, patch: Partial<Collection>): Promise<void> => (await store()).updateCollection(id, patch);
+export const deleteCollection = async (id: string): Promise<void>             => (await store()).deleteCollection(id);
 
-export async function getCollections(userId: string): Promise<Collection[]> {
-  return (await adapter()).getCollections(userId);
-}
-export async function getCollection(id: string): Promise<Collection | null> {
-  return (await adapter()).getCollection(id);
-}
-export async function saveCollection(col: Collection): Promise<void> {
-  return (await adapter()).saveCollection(col);
-}
-export async function updateCollection(id: string, patch: Partial<Collection>): Promise<void> {
-  return (await adapter()).updateCollection(id, patch);
-}
-export async function deleteCollection(id: string): Promise<void> {
-  return (await adapter()).deleteCollection(id);
-}
+/* Documents */
+export const getDocuments = async (uid: string, colId?: string): Promise<DocumentMeta[]>    => (await store()).getDocuments(uid, colId);
+export const getDocument  = async (id: string):                   Promise<DocumentMeta|null> => (await store()).getDocument(id);
+export const saveDocument = async (d: DocumentMeta): Promise<void>                           => (await store()).saveDocument(d);
+export const deleteDocument = async (id: string):    Promise<void>                           => (await store()).deleteDocument(id);
 
-export async function getDocuments(userId: string, collectionId?: string): Promise<DocumentMeta[]> {
-  return (await adapter()).getDocuments(userId, collectionId);
-}
-export async function getDocument(id: string): Promise<DocumentMeta | null> {
-  return (await adapter()).getDocument(id);
-}
-export async function saveDocument(doc: DocumentMeta): Promise<void> {
-  return (await adapter()).saveDocument(doc);
-}
-export async function deleteDocument(id: string): Promise<void> {
-  return (await adapter()).deleteDocument(id);
-}
+/* Chunks */
+export const addChunks    = async (chunks: Chunk[]): Promise<void> => (await store()).addChunks(chunks);
+export const deleteChunks = async (docId: string):  Promise<void>  => (await store()).deleteChunks(docId);
 
-export async function addChunks(chunks: Chunk[]): Promise<void> {
-  return (await adapter()).addChunks(chunks);
-}
-export async function deleteChunks(documentId: string): Promise<void> {
-  return (await adapter()).deleteChunks(documentId);
-}
-
-export async function search(
-  queryEmbedding: number[],
-  opts: { userId: string; collectionId?: string; topK?: number },
-) {
-  return (await adapter()).search(queryEmbedding, opts);
-}
+/* Vector search */
+export const search = async (
+  qEmbed: number[],
+  opts:   { userId: string; collectionId?: string; topK?: number },
+): Promise<Citation[]> => (await store()).search(qEmbed, opts);
