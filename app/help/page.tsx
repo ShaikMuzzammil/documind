@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import AuthGate from '@/components/app/AuthGate';
 import {
-  BookOpen, Upload, MessageSquare, FolderOpen, BarChart3, Download,
+  BookOpen, Upload, MessageSquare, FolderOpen,
   Shield, Search, Braces, ChevronDown, ChevronUp, ArrowRight,
   CheckCircle2, AlertTriangle, Zap, FileText,
 } from 'lucide-react';

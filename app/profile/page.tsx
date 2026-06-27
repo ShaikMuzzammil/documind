@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import AuthGate from '@/components/app/AuthGate';
 import { useUser } from '@/lib/use-user';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { User, BarChart3, FileText, FolderOpen, Database, Cpu, Loader2, Calendar } from 'lucide-react';
+import { BarChart3, FileText, FolderOpen, Database, Cpu, Loader2, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface Stats {

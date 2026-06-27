@@ -6,7 +6,7 @@ import StatsCard   from '@/components/app/StatsCard';
 import RecentActivity, { ActivityEvent } from '@/components/app/RecentActivity';
 import { AnalyticsSkeleton } from '@/components/app/LoadingSkeleton';
 import { useUser } from '@/lib/use-user';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import {
   FileText, FolderOpen, BarChart3, Zap, Database, Cpu,
   AlertTriangle, CheckCircle2, RefreshCw, MessageSquare,
@@ -56,7 +56,7 @@ function WorkspaceInner() {
       <div className="flex items-start justify-between mb-7 gap-4">
         <div>
           <h1 className="text-2xl font-bold">{greeting}, {firstName} 👋</h1>
-          <p className="text-sm text-text-muted mt-1">Here's what's happening in your workspace.</p>
+          <p className="text-sm text-text-muted mt-1">Here&apos;s what&apos;s happening in your workspace.</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button onClick={load}

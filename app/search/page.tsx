@@ -120,7 +120,7 @@ function SearchInner() {
       {/* Results */}
       {searched && (
         <p className="text-xs text-text-muted mb-4">
-          {total} result{total !== 1 ? 's' : ''} for <span className="text-text-primary">"{query}"</span>
+          {total} result{total !== 1 ? 's' : ''} for <span className="text-text-primary">&quot;{query}&quot;</span>
         </p>
       )}
 

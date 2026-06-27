@@ -45,7 +45,6 @@ export default function PIIScanner() {
   const [text,      setText]      = useState('');
   const [result,    setResult]    = useState<ScanResult | null>(null);
   const [loading,   setLoading]   = useState(false);
-  const [redacted,  setRedacted]  = useState(false);
   const [showText,  setShowText]  = useState(true);
   const [expanded,  setExpanded]  = useState(false);
   const [copied,    setCopied]    = useState(false);

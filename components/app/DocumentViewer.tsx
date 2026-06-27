@@ -31,7 +31,7 @@ function CopyBtn({ text }: { text: string }) {
 
 export default function DocumentViewer({ documentId, documentName, documentSize, onClose }: Props) {
   const [chunks,  setChunks]  = useState<Chunk[]>([]);
-  const [docInfo, setDocInfo] = useState<DocInfo | null>(null);
+  const [_docInfo, setDocInfo] = useState<DocInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [search,  setSearch]  = useState('');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());

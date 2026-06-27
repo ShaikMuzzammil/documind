@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  MessageSquare, Upload, BarChart3, Download,
+  MessageSquare, Upload, BarChart3,
   Shield, Braces, Search, FolderOpen,
 } from 'lucide-react';
 

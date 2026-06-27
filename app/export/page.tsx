@@ -8,7 +8,7 @@ import { useCollections } from '@/lib/use-collections';
 import { toast } from '@/components/app/Toast';
 import { SchemaField } from '@/lib/types';
 import {
-  Download, Plus, Trash2, Loader2, FileText, Package,
+  Download, Plus, Loader2, FileText, Package,
   Database, MessageSquare, Braces, Play, AlertTriangle,
   CheckCircle2, X, Shield,
 } from 'lucide-react';

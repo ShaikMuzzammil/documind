@@ -3,7 +3,7 @@ import { requireCurrentUser } from '@/lib/auth';
 import { embedOne } from '@/lib/embeddings';
 import { search } from '@/lib/store';
 import { getDocuments, getCollections } from '@/lib/store';
-import { citationsToResults, keywordScore, extractSnippet, buildHighlights } from '@/lib/search';
+import { citationsToResults, keywordScore, buildHighlights } from '@/lib/search';
 
 export async function GET(req: NextRequest) {
   const user = await requireCurrentUser(req).catch(() => null);
@@ -41,7 +41,6 @@ export async function GET(req: NextRequest) {
 
   // Keyword fallback / hybrid boost
   if (mode === 'keyword' || mode === 'hybrid') {
-    const words = query.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
     const seen  = new Set(results.map((r) => r.documentId));
 
     for (const doc of docs.filter((d) => d.status === 'ready')) {

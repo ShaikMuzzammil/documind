@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   FileText, FileCode, FileSpreadsheet, Package, Trash2, Eye,
-  MessageSquare, MoreVertical, Download,
+  MessageSquare, MoreVertical,
 } from 'lucide-react';
 import { DocumentMeta } from '@/lib/types';
 import { formatBytes } from '@/lib/utils';

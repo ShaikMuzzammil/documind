@@ -122,7 +122,7 @@ export default function SearchPanel({ open, onClose }: Props) {
               <div className="max-h-[60vh] overflow-y-auto">
                 {results.length === 0 && query.length > 1 && !loading && (
                   <div className="py-10 text-center text-sm text-text-muted">
-                    No results found for <span className="text-text-primary">"{query}"</span>
+                    No results found for <span className="text-text-primary">&quot;{query}&quot;</span>
                   </div>
                 )}
 
