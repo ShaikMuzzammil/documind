@@ -40,3 +40,6 @@ export async function embedOne(text: string): Promise<number[]> {
   const [v] = await embed([text]);
   return v;
 }
+
+/** Re-exported for backward compatibility with older adapter files */
+export { cosineSim as cosineSimilarity } from '@/lib/utils';
