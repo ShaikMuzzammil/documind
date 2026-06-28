@@ -150,7 +150,7 @@ export default function AppSidebar() {
               <LogOut className="w-3.5 h-3.5" />
             </button>
           </div>
-          <p className="px-3 mt-2 text-[10px] text-text-muted font-mono">DocuMind v3.0</p>
+          <p className="px-3 mt-2 text-[10px] text-text-muted font-mono">DocuMind v3.1</p>
         </div>
       </aside>
 

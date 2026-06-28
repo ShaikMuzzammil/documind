@@ -1,58 +1,154 @@
-# DocuMind v3 — Document Intelligence Platform
+# 🧠 DocuMind — Document Intelligence Platform
 
-> Upload documents. Ask questions. Get grounded, cited answers from your own data.
+> **Upload any document. Ask anything. Get cited, grounded answers from your own data.**
 
----
-
-## Overview
-
-DocuMind is a production-grade **Retrieval-Augmented Generation (RAG)** platform built with Next.js 15. It lets users upload documents, index them using high-dimensional semantic embeddings, and query them through a streaming AI chat interface with full source citations.
-
-Every answer is grounded in your actual documents — not general knowledge. No hallucinations. Every claim links to its exact source chunk with a confidence score.
+[![Next.js](https://img.shields.io/badge/Next.js-16.2.9-black?logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?logo=typescript)](https://typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38bdf8?logo=tailwindcss)](https://tailwindcss.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?logo=postgresql)](https://neon.tech)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ---
 
-## Architecture
+## ✨ What is DocuMind?
+
+DocuMind is a **production-grade RAG (Retrieval-Augmented Generation) platform** that lets you upload documents and query them through a streaming AI chat interface with full source citations. Every answer is grounded in your actual documents — not hallucinated from general knowledge.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    DocuMind v3 Pipeline                      │
-├──────────┬──────────┬───────────┬──────────┬────────────────┤
-│  Ingest  │  Chunk   │   Embed   │  Index   │  Query/Answer  │
-│  PDF/TXT │ Semantic │ 768-dim   │ pgvector │  LLM + SSE     │
-│  MD/CSV  │ boundary │ embedding │ cosine   │  streaming     │
-│  JSON/TS │ detect   │ model     │ IVFFlat  │  + citations   │
-└──────────┴──────────┴───────────┴──────────┴────────────────┘
+Upload Docs → Semantic Chunking → 768-dim Embeddings → Vector Search → Cited AI Answer
 ```
 
-**Stack:**
-- **Framework:** Next.js 15.3.4 (App Router, Server Components)
-- **AI Layer:** Streaming REST calls to AI generation + embedding models
-- **Vector Store:** PostgreSQL + pgvector (or local JSON fallback)
-- **Auth:** HMAC-signed session cookies (no external OAuth)
-- **Styling:** Tailwind CSS v4 with custom design tokens
-- **Charts:** Recharts
-- **Animations:** Framer Motion
+---
+
+## 🚀 Features
+
+| Feature | Description |
+|---------|-------------|
+| 💬 **AI Chat** | Streaming answers with numbered citations and confidence scores |
+| 📄 **Smart Upload** | PDF, TXT, MD, CSV, JSON, TS/JS/PY — multi-file drag-drop with progress |
+| 📁 **Collections** | Organize documents into isolated workspaces |
+| 🔍 **Semantic Search** | Hybrid vector + keyword search across all documents |
+| 📊 **Analytics Dashboard** | Document health, chunk coverage, collection stats (Recharts) |
+| 🧩 **Schema Extraction** | AI batch-extracts structured fields from entire collections → CSV/JSON |
+| 🛡️ **PII Scanner** | Detect & redact emails, SSNs, credit cards, phone numbers |
+| 👁️ **Chunk Viewer** | Inspect indexed document chunks with stats |
+| ⚡ **Dashboard** | Workspace overview with activity timeline, system status |
+| 📤 **Multi-format Export** | CSV, JSON, Markdown chat export |
+| ⌨️ **Keyboard Shortcuts** | ⌘K search, full shortcuts panel |
+| 🔑 **Secure Auth** | HMAC-SHA256 session cookies, no external auth dependency |
 
 ---
 
-## Features
+## 🏗️ Architecture
 
-| Area | Capability |
-|------|-----------|
-| **Documents** | PDF, TXT, MD, CSV, JSON, TS/JS/PY — multi-file drag-drop with live progress |
-| **Indexing** | Semantic chunking → 768-dim embedding → vector search |
-| **Chat** | Streaming responses, per-message citations with confidence bars, export to Markdown |
-| **Collections** | Organize documents into isolated workspaces |
-| **Analytics** | Document health, type breakdown, per-collection stats, recent activity |
-| **Export** | CSV (documents), JSON (collections), Markdown (chat), Schema CSV/JSON |
-| **Schema Extraction** | Define JSON schema → AI extracts structured fields from entire collections |
-| **Settings** | Profile management, AI preferences, notification settings, privacy controls |
-| **Auth** | Secure session cookies, clear error messages, password visibility toggle |
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     DocuMind RAG Pipeline                       │
+├──────────┬──────────┬────────────┬───────────┬──────────────────┤
+│  Ingest  │  Chunk   │   Embed    │   Index   │   Query/Answer   │
+│  PDF/TXT │ Semantic │  768-dim   │ pgvector  │ LLM + SSE stream │
+│  MD/CSV  │ boundary │  AI model  │  cosine   │ + inline cites   │
+│  JSON/TS │ overlap  │  batchEmbed│  IVFFlat  │ confidence score │
+└──────────┴──────────┴────────────┴───────────┴──────────────────┘
+```
+
+**Tech Stack:**
+- **Framework:** Next.js 16.2.9 (App Router) · React 19
+- **Language:** TypeScript 5.7 (strict mode)
+- **AI:** Streaming REST API (Gemini 2.0 Flash / text-embedding-004)
+- **Database:** PostgreSQL + pgvector **or** local JSON file store (auto-detected)
+- **Auth:** HMAC-SHA256 session cookies (zero external deps)
+- **Styling:** Tailwind CSS 3.4 + Framer Motion 12
+- **Charts:** Recharts 2.13
+- **Icons:** Lucide React
 
 ---
 
-## Quick Start
+## 📦 Project Structure
+
+```
+documind/
+├── app/
+│   ├── page.tsx              # Landing page (9 sections, interactive demo)
+│   ├── layout.tsx            # Root layout + Navigation + Sidebar + Toast
+│   ├── globals.css           # Tailwind + custom design tokens
+│   ├── workspace/page.tsx    # Main dashboard with activity + health
+│   ├── chat/page.tsx         # Streaming AI chat with citations
+│   ├── documents/page.tsx    # Upload, browse, view chunks
+│   ├── collections/page.tsx  # Collection management + inline edit
+│   ├── analytics/page.tsx    # Recharts analytics dashboard
+│   ├── export/page.tsx       # Export + Schema Extraction + PII Scanner
+│   ├── search/page.tsx       # Hybrid semantic + keyword search
+│   ├── profile/page.tsx      # User profile + usage stats
+│   ├── settings/page.tsx     # Profile, AI prefs, privacy
+│   ├── help/page.tsx         # Full help center + FAQ
+│   ├── auth/page.tsx         # Sign in / Register
+│   └── api/                  # 24 API routes
+│       ├── chat/             # Streaming RAG chat
+│       ├── ingest/           # Document upload + indexing
+│       ├── search/           # Hybrid search
+│       ├── schema-extract/   # AI batch extraction
+│       ├── pii-detect/       # PII detection + redaction
+│       ├── workspace/        # Dashboard stats
+│       ├── analytics/        # Aggregated stats
+│       ├── export/           # CSV, JSON, Markdown, schema exports
+│       ├── documents/[id]/   # Document + chunk management
+│       ├── collections/[id]/ # Collection CRUD + stats
+│       ├── user/stats/       # User statistics
+│       └── me/               # Profile GET + PATCH
+├── components/
+│   ├── shared/
+│   │   ├── Navigation.tsx    # Sticky nav with section highlighting
+│   │   └── AppSidebar.tsx    # Sidebar with ⌘K search, user display
+│   └── app/
+│       ├── Citations.tsx     # Source citations with confidence bars
+│       ├── DocumentCard.tsx  # Rich card with chunk viewer drawer
+│       ├── DocumentViewer.tsx# Chunk inspector with stats
+│       ├── PIIScanner.tsx    # PII detection UI
+│       ├── SearchPanel.tsx   # ⌘K global search overlay
+│       ├── ChatSuggestions.tsx # Smart suggested questions
+│       ├── OnboardingModal.tsx # 3-step first-run guide
+│       ├── KeyboardShortcuts.tsx
+│       ├── LoadingSkeleton.tsx # All skeleton states
+│       ├── StatsCard.tsx
+│       ├── RecentActivity.tsx
+│       ├── ConfirmModal.tsx
+│       ├── EmptyState.tsx
+│       ├── ProgressBar.tsx
+│       ├── StatusBadge.tsx
+│       └── Toast.tsx         # Global notification system
+├── lib/
+│   ├── store.ts              # Unified DB adapter (Postgres or JSON)
+│   ├── db-json.ts            # JSON file store (dev/demo)
+│   ├── db-postgres.ts        # PostgreSQL + pgvector
+│   ├── storage/              # Backward-compatible storage interfaces
+│   ├── llm.ts                # Streaming AI with quota error handling
+│   ├── embeddings.ts         # Batch embeddings with fallback
+│   ├── pii.ts                # PII detection engine
+│   ├── search.ts             # BM25 + highlight utilities
+│   ├── analytics-utils.ts    # Collection health + time series
+│   ├── auth.ts               # HMAC session management
+│   ├── chunk.ts              # Semantic text chunker
+│   ├── validators.ts         # Input validation
+│   ├── format.ts             # Date, bytes, number formatting
+│   ├── constants.ts          # App-wide constants
+│   ├── cn.ts                 # className utility
+│   ├── use-user.ts           # User state hook
+│   ├── use-collections.ts    # Collections hook
+│   └── hooks/                # useDebounce, useAsync, usePagination, etc.
+├── public/favicon.svg
+├── middleware.ts             # Route protection
+├── postcss.config.js         # Tailwind PostCSS
+├── tailwind.config.ts        # Custom color tokens
+├── next.config.ts            # Next.js 16.2.9 config
+├── tsconfig.json
+├── vercel.json
+└── .env.example
+```
+
+---
+
+## ⚡ Quick Start
 
 ### 1. Install dependencies
 
@@ -69,213 +165,127 @@ cp .env.example .env.local
 Edit `.env.local`:
 
 ```env
-AI_API_KEY=your_ai_api_key_here
-AUTH_SECRET=your_random_32_char_string
+AI_API_KEY=your_gemini_api_key_from_aistudio.google.com
+AUTH_SECRET=your_random_secret   # openssl rand -base64 32
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-Generate `AUTH_SECRET`:
-```bash
-openssl rand -base64 32
-```
+> **No database needed for dev** — uses local `.data/` JSON store automatically.
 
-### 3. (Optional) Add a database
-
-```env
-DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
-DATABASE_SSL=true
-```
-
-If `DATABASE_URL` is not set, DocuMind automatically uses a local JSON store (`.data/` directory) — perfect for development and demos.
-
-### 4. Run
+### 3. Run
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) → Create account → Create collection → Upload a document → Chat 🎉
 
 ---
 
-## Environment Variables
+## 🌐 Deploy to Vercel (Free)
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `AI_API_KEY` | AI API key (Gemini, OpenAI-compatible) | ✅ For AI features |
-| `AUTH_SECRET` | HMAC secret for session cookies — run `openssl rand -base64 32` | ✅ |
-| `NEXT_PUBLIC_APP_URL` | Deployment URL without trailing slash | ✅ |
-| `DATABASE_URL` | PostgreSQL connection string with pgvector | Optional |
-| `DATABASE_SSL` | Set `false` for local dev without SSL | Optional |
-| `AI_CHAT_MODEL` | Override chat model (default: `gemini-2.0-flash`) | Optional |
-| `AI_EMBED_MODEL` | Override embedding model (default: `text-embedding-004`) | Optional |
-| `RESEND_API_KEY` | For welcome emails via Resend | Optional |
-| `EMAIL_FROM` | Sender address, e.g. `DocuMind <noreply@yourdomain.com>` | Optional |
-
----
-
-## Vercel Deployment
-
-### 1. Push to GitHub
+### Step 1 — Push to GitHub
 
 ```bash
-git init && git add . && git commit -m "init: DocuMind v3"
+git init
+git add .
+git commit -m "feat: DocuMind v3 — document intelligence platform"
 git remote add origin https://github.com/YOUR_USERNAME/documind.git
 git push -u origin main
 ```
 
-### 2. Import on Vercel
+### Step 2 — Import on Vercel
 
 [vercel.com/new](https://vercel.com/new) → Import repo → Framework auto-detected as **Next.js**.
 
-### 3. Build settings (all defaults — nothing to change)
+### Step 3 — Set Environment Variables
 
-| Setting | Value |
-|---------|-------|
-| Framework | Next.js |
-| Build Command | `npm run build` |
-| Install Command | `npm install` |
-| Node.js | 20.x |
+| Variable | Value | Required |
+|----------|-------|----------|
+| `AI_API_KEY` | From [aistudio.google.com](https://aistudio.google.com) | ✅ |
+| `AUTH_SECRET` | `openssl rand -base64 32` | ✅ |
+| `NEXT_PUBLIC_APP_URL` | `https://your-project.vercel.app` | ✅ |
+| `DATABASE_URL` | PostgreSQL connection string | Optional |
+| `DATABASE_SSL` | `true` | Optional |
+| `AI_CHAT_MODEL` | `gemini-2.0-flash` (default) | Optional |
+| `AI_EMBED_MODEL` | `text-embedding-004` (default) | Optional |
+| `RESEND_API_KEY` | For welcome emails | Optional |
 
-### 4. Environment Variables
+### Step 4 — Free Database: Neon
 
-Add in **Project Settings → Environment Variables**:
+1. Sign up at [neon.tech](https://neon.tech) → Create project
+2. Copy connection string: `postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require`
+3. Add as `DATABASE_URL` in Vercel + set `DATABASE_SSL=true`
+4. pgvector is pre-enabled on Neon — tables auto-created on first request ✓
 
-```
-AI_API_KEY          = <your key>
-AUTH_SECRET         = <openssl rand -base64 32>
-NEXT_PUBLIC_APP_URL = https://your-project.vercel.app
-DATABASE_URL        = <neon or supabase connection string>
-DATABASE_SSL        = true
-```
+### Step 5 — Deploy
 
-### 5. Free Database (Neon recommended)
-
-1. Go to [neon.tech](https://neon.tech) → Create project
-2. Copy the connection string (format: `postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require`)
-3. Paste as `DATABASE_URL` in Vercel
-4. pgvector is pre-enabled on Neon — no setup needed
-5. DocuMind auto-creates all tables on first request
-
-### 6. Deploy
-
-Click **Deploy**. First build ~60s.
-
-### 7. Update APP_URL
-
-After deployment, update `NEXT_PUBLIC_APP_URL` to your live URL and redeploy.
+Click **Deploy** → ~90 seconds → Live ✓
 
 ---
 
-## Project Structure
+## 🗺️ API Reference
 
-```
-documind/
-├── app/
-│   ├── page.tsx              # Landing page (9 sections, no external links)
-│   ├── layout.tsx            # Root layout with Navigation + Sidebar + Toast
-│   ├── globals.css           # Design tokens (midnight navy + blue + emerald)
-│   ├── auth/page.tsx         # Sign in / Register with clear error messages
-│   ├── chat/page.tsx         # Streaming chat with citations
-│   ├── documents/page.tsx    # Multi-file upload with drag-drop + progress
-│   ├── collections/page.tsx  # Collection management with inline edit
-│   ├── analytics/page.tsx    # Recharts dashboard
-│   ├── export/page.tsx       # Bulk export + schema-driven AI extraction
-│   ├── settings/page.tsx     # Profile, AI prefs, notifications, privacy
-│   └── api/
-│       ├── me/route.ts       # GET + PATCH user profile
-│       ├── auth/             # login, register, logout
-│       ├── chat/route.ts     # Streaming RAG chat
-│       ├── ingest/route.ts   # Document upload + chunking + embedding
-│       ├── documents/        # GET, DELETE
-│       ├── collections/      # GET, POST, PATCH, DELETE
-│       ├── analytics/        # Aggregated workspace stats
-│       ├── export/           # CSV, JSON, Markdown exports
-│       ├── schema-extract/   # AI batch field extraction
-│       └── health/           # Uptime endpoint
-├── components/
-│   ├── shared/
-│   │   ├── Navigation.tsx    # Sticky nav with section scroll-highlighting
-│   │   └── AppSidebar.tsx    # App sidebar with user display + logout
-│   └── app/
-│       ├── AuthGate.tsx      # Client-side auth guard
-│       ├── Citations.tsx     # Expandable citations with confidence bars
-│       ├── CollectionPicker.tsx
-│       └── Toast.tsx         # Global notification system
-├── lib/
-│   ├── types.ts              # TypeScript interfaces
-│   ├── utils.ts              # formatBytes, generateId, cosineSim
-│   ├── auth.ts               # HMAC sessions, hashPassword
-│   ├── store.ts              # Unified adapter (Postgres or JSON)
-│   ├── db-json.ts            # Local JSON file store
-│   ├── db-postgres.ts        # PostgreSQL + pgvector adapter
-│   ├── llm.ts                # Streaming AI with quota error handling
-│   ├── embeddings.ts         # Batch embedding with hash fallback
-│   ├── chunk.ts              # Semantic text chunker
-│   ├── use-user.ts           # React hook for current user
-│   └── use-collections.ts    # React hook for collections
-├── middleware.ts             # Server-side auth guard
-├── vercel.json               # 60s timeout + CORS headers
-├── next.config.ts
-├── tsconfig.json
-└── .env.example
-```
-
----
-
-## API Reference
-
-| Method | Route | Description |
-|--------|-------|-------------|
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | `GET` | `/api/me` | Current user info |
 | `PATCH` | `/api/me` | Update name / password |
 | `POST` | `/api/auth/register` | Create account |
 | `POST` | `/api/auth/login` | Sign in |
 | `POST` | `/api/auth/logout` | Sign out |
-| `POST` | `/api/ingest` | Upload + index document |
-| `POST` | `/api/chat` | Streaming RAG chat |
-| `GET` | `/api/documents` | List documents (filter by collectionId) |
+| `POST` | `/api/ingest` | Upload + chunk + embed document |
+| `POST` | `/api/chat` | Streaming RAG chat (SSE) |
+| `GET` | `/api/search` | Hybrid semantic + keyword search |
+| `POST` | `/api/schema-extract` | AI batch field extraction |
+| `POST` | `/api/pii-detect` | PII detection + redaction |
+| `GET` | `/api/workspace` | Dashboard overview + activity |
+| `GET` | `/api/analytics` | Full workspace analytics |
+| `GET` | `/api/documents` | List documents |
 | `DELETE` | `/api/documents/:id` | Delete document + chunks |
+| `GET` | `/api/documents/:id/chunks` | View indexed chunks |
 | `GET` | `/api/collections` | List collections |
 | `POST` | `/api/collections` | Create collection |
-| `PATCH` | `/api/collections/:id` | Update name/description |
+| `PATCH` | `/api/collections/:id` | Update collection |
 | `DELETE` | `/api/collections/:id` | Delete collection |
-| `GET` | `/api/analytics` | Workspace stats |
-| `GET` | `/api/export/documents` | CSV export |
-| `GET` | `/api/export/collections` | JSON export |
-| `POST` | `/api/export/chat` | Markdown chat export |
-| `POST` | `/api/schema-extract` | AI batch field extraction |
-| `GET` | `/api/health` | Uptime check |
+| `GET` | `/api/collections/:id/stats` | Collection health stats |
+| `GET` | `/api/export/documents` | Export CSV |
+| `GET` | `/api/export/collections` | Export JSON |
+| `POST` | `/api/export/chat` | Export chat as Markdown |
+| `POST` | `/api/export/schema` | Download schema template |
+| `GET` | `/api/user/stats` | User statistics + activity |
+| `GET` | `/api/health` | Health check endpoint |
 
 ---
 
-## Key Design Decisions
+## 🔒 Security
 
-**Why local JSON fallback?**
-DocuMind is fully functional without any database — useful for demos, local development, and deployments where setting up pgvector is overhead. The adapter pattern in `lib/store.ts` makes the database swap transparent.
-
-**Why HMAC cookies instead of JWT / NextAuth?**
-Zero dependencies, deterministic, fast. HMAC-SHA256 with a strong secret provides the same security guarantees as JWT for session management at a fraction of the code complexity.
-
-**Why streaming chat?**
-Server-Sent Events allow the first token to appear in under 1 second, giving immediate visual feedback that the system is working — critical UX for AI interfaces.
-
-**AI Quota Handling**
-When the free tier quota is exceeded, the system returns a user-friendly message instead of a raw API error object. This was a key fix from v2 where raw JSON error payloads were displayed to users.
+- **HMAC-SHA256** session cookies (no JWT, no OAuth dependency)
+- **Per-user namespace isolation** — no cross-user data leakage
+- **PII detection** — 7 PII types detected and auto-redacted before sharing
+- **Security HTTP headers** — X-Frame-Options, CSP, X-Content-Type-Options
+- **Input validation** — all endpoints validate with `lib/validators.ts`
+- **Rate limiting** — graceful quota handling for AI API calls
+- **No secrets exposed** — all AI/DB keys server-side only
 
 ---
 
-## Roadmap
+## 🗺️ Roadmap
 
-- [ ] GraphRAG — cross-document entity relationship extraction
-- [ ] Layout-aware PDF parsing (table + chart extraction)
-- [ ] Bounding-box PDF citations (click to jump to page)
-- [ ] PII auto-redaction before AI processing
-- [ ] Webhook on document processing completion
-- [ ] Team workspaces with RBAC
+- [ ] GraphRAG — cross-document knowledge graph extraction  
+- [ ] Layout-aware PDF parsing (table + chart recognition)  
+- [ ] Bounding-box PDF citations (click to jump to page)  
+- [ ] Team workspaces with RBAC  
+- [ ] Webhook on document processing completion  
+- [ ] Fine-tuned embedding model support  
 
 ---
 
-## License
+## 📄 License
 
 MIT — modify and deploy freely.
+
+---
+
+<p align="center">
+  Built with ❤️ using Next.js 16 · TypeScript · Tailwind CSS · pgvector
+</p>
