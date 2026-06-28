@@ -10,12 +10,11 @@ export default [
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
   {
     rules: {
-      '@typescript-eslint/no-unused-vars':    ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_' }],
-      '@typescript-eslint/no-explicit-any':   'warn',
-      'react/no-unescaped-entities':          'error',
-      'react-hooks/rules-of-hooks':           'error',
-      'react-hooks/exhaustive-deps':          'warn',
-      '@next/next/no-html-link-for-pages':    'error',
+      '@typescript-eslint/no-unused-vars':  ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-explicit-any': 'warn',
+      'react/no-unescaped-entities':        'error',
+      'react-hooks/rules-of-hooks':         'error',
+      '@next/next/no-html-link-for-pages':  'error',
     },
   },
 ];
