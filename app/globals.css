@@ -1,98 +1,102 @@
 @import 'tailwindcss';
 
 :root {
-  --bg-primary: #0a0b10;
-  --bg-secondary: #11131a;
-  --bg-card: #161922;
-  --bg-hover: #1d212c;
-  --border: rgba(255, 255, 255, 0.08);
-  --text-primary: #e6e9ef;
-  --text-secondary: #a7adba;
-  --text-muted: #6b7280;
-  --accent: #6366f1;
-  --accent-2: #22d3ee;
-  --accent-soft: rgba(99, 102, 241, 0.12);
-  --success: #34d399;
-  --danger: #f87171;
+  --bg-primary:    #080a0f;
+  --bg-secondary:  #0f1117;
+  --bg-card:       #141720;
+  --bg-hover:      #1c2030;
+  --border:        rgba(255, 255, 255, 0.08);
+  --text-primary:  #e8ecf3;
+  --text-secondary:#a0a8bc;
+  --text-muted:    #60677a;
+  --accent:        #6366f1;
+  --accent-2:      #22d3ee;
+  --accent-soft:   rgba(99, 102, 241, 0.12);
+  --success:       #34d399;
+  --danger:        #f87171;
+  --warning:       #fbbf24;
 }
 
 @theme inline {
-  --color-bg-primary: var(--bg-primary);
-  --color-bg-secondary: var(--bg-secondary);
-  --color-bg-card: var(--bg-card);
-  --color-bg-hover: var(--bg-hover);
-  --color-border: var(--border);
-  --color-text-primary: var(--text-primary);
-  --color-text-secondary: var(--text-secondary);
-  --color-text-muted: var(--text-muted);
-  --color-accent: var(--accent);
-  --color-accent-2: var(--accent-2);
-  --color-success: var(--success);
-  --color-danger: var(--danger);
+  --color-bg-primary:    var(--bg-primary);
+  --color-bg-secondary:  var(--bg-secondary);
+  --color-bg-card:       var(--bg-card);
+  --color-bg-hover:      var(--bg-hover);
+  --color-border:        var(--border);
+  --color-text-primary:  var(--text-primary);
+  --color-text-secondary:var(--text-secondary);
+  --color-text-muted:    var(--text-muted);
+  --color-accent:        var(--accent);
+  --color-accent-2:      var(--accent-2);
+  --color-success:       var(--success);
+  --color-danger:        var(--danger);
+  --color-warning:       var(--warning);
 }
 
-html,
-body {
+html, body {
   background: var(--bg-primary);
   color: var(--text-primary);
+  scroll-behavior: smooth;
 }
 
 * {
   border-color: var(--border);
+  box-sizing: border-box;
 }
 
+/* ── Glass surface ───────────────────────────────────────────────────── */
 .glass {
-  background: color-mix(in srgb, var(--bg-card) 80%, transparent);
+  background: color-mix(in srgb, var(--bg-card) 78%, transparent);
   border: 1px solid var(--border);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
+/* ── Gradient text ───────────────────────────────────────────────────── */
 .gradient-text {
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  background: linear-gradient(100deg, var(--accent) 0%, var(--accent-2) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
+/* ── Hero radial glow ────────────────────────────────────────────────── */
 .hero-glow {
   background:
-    radial-gradient(60% 50% at 50% 0%, rgba(99, 102, 241, 0.18), transparent 70%),
-    radial-gradient(40% 40% at 80% 20%, rgba(34, 211, 238, 0.12), transparent 70%);
+    radial-gradient(65% 55% at 50% 0%, rgba(99, 102, 241, 0.16), transparent 70%),
+    radial-gradient(40% 38% at 85% 15%, rgba(34, 211, 238, 0.10), transparent 70%),
+    radial-gradient(30% 30% at 10% 80%, rgba(99, 102, 241, 0.06), transparent 70%);
 }
 
-/* Thin scrollbars */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--bg-hover);
-  border-radius: 8px;
-}
+/* ── Scrollbars ──────────────────────────────────────────────────────── */
+::-webkit-scrollbar          { width: 6px; height: 6px; }
+::-webkit-scrollbar-track    { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb    { background: var(--bg-hover); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.4); }
 
+/* ── Print ───────────────────────────────────────────────────────────── */
 @media print {
-  nav,
-  aside,
-  .no-print {
-    display: none !important;
-  }
+  nav, aside, .no-print { display: none !important; }
 }
 
-/* Brand mark animation */
+/* ── DocuMind logo animations ────────────────────────────────────────── */
 @keyframes documind-breathe {
-  0%, 100% {
-    filter: drop-shadow(0 0 0 rgba(99, 102, 241, 0));
+  0%,100% {
+    filter: drop-shadow(0 0 0px rgba(99,102,241,0));
     transform: scale(1);
   }
   50% {
-    filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.55));
-    transform: scale(1.04);
+    filter: drop-shadow(0 0 7px rgba(99,102,241,0.6));
+    transform: scale(1.05);
   }
 }
+
 @keyframes documind-pulse-dot {
-  0%, 100% { opacity: 0.65; r: 2.1; }
-  50% { opacity: 1; r: 2.6; }
+  0%,100% { opacity: 0.65; }
+  50%      { opacity: 1;    }
 }
+
 .documind-logo-breathe {
   animation: documind-breathe 3.4s ease-in-out infinite;
 }
@@ -100,9 +104,31 @@ body {
   animation: documind-pulse-dot 2s ease-in-out infinite;
   transform-origin: center;
 }
+
 @media (prefers-reduced-motion: reduce) {
   .documind-logo-breathe,
   .documind-logo-pulse {
     animation: none;
   }
+}
+
+/* ── Loading pulse (skeleton) ────────────────────────────────────────── */
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+.animate-pulse { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+
+/* ── Chat message fade-in ────────────────────────────────────────────── */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+.msg-enter {
+  animation: fadeSlideIn 0.22s ease-out forwards;
+}
+
+/* ── Sidebar transition ──────────────────────────────────────────────── */
+.sidebar-transition {
+  transition: width 200ms ease, opacity 200ms ease;
 }

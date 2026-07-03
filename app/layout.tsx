@@ -1,17 +1,35 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import Navigation from '@/components/shared/Navigation';
 import AppSidebar from '@/components/shared/AppSidebar';
 
-const inter = Inter({ variable: '--font-inter', subsets: ['latin'] });
-const mono = JetBrains_Mono({ variable: '--font-mono', subsets: ['latin'] });
+const inter = Inter({
+  variable: '--font-inter',
+  subsets: ['latin'],
+  display: 'swap',
+});
+const mono = JetBrains_Mono({
+  variable: '--font-mono',
+  subsets: ['latin'],
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
-  title: 'DocuMind - Chat with your documents',
+  title: {
+    default: 'DocuMind – Intelligent Document Workspace',
+    template: '%s · DocuMind',
+  },
   description:
-    'An AI knowledge workspace: upload documents, ask questions, and get answers with citations. Retrieval-augmented generation, done right.',
-  keywords: ['RAG', 'AI', 'documents', 'embeddings', 'vector search', 'LLM', 'chatbot'],
+    'Upload documents, ask questions in plain language, and get grounded, cited answers from your own files. A private RAG workspace powered by your own AI keys.',
+  keywords: ['document AI', 'RAG', 'vector search', 'document intelligence', 'chat with PDF'],
+  robots: { index: true, follow: true },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#080a0f',
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
