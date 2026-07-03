@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
-import { destroySession } from '@/lib/auth';
+import { SESSION_COOKIE } from '@/lib/auth';
 
 export async function POST() {
-  await destroySession();
-  return NextResponse.json({ success: true });
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set({
+    name: SESSION_COOKIE,
+    value: '',
+    maxAge: 0,
+    path: '/',
+  });
+  return response;
 }

@@ -1,41 +1,47 @@
-/**
- * Unified store — delegates to Postgres+pgvector or local JSON file store.
- * Uses static imports so Next.js tree-shakes correctly.
- */
-import type { Collection, Chunk, DocumentMeta, User } from '@/lib/types';
-import type { Citation } from '@/lib/types';
+// Thin facade over the selected storage adapter (JSON or Postgres+pgvector).
+//
+// All operations are scoped by userId. Routes call these helpers; the adapter
+// is chosen automatically based on whether DATABASE_URL is configured.
 
-const USE_PG = Boolean(process.env.DATABASE_URL);
+import { Chunk, Citation, Collection, DocumentMeta } from './types';
+import { getStorage } from './storage';
 
-async function pg()   { return import('@/lib/db-postgres'); }
-async function json() { return import('@/lib/db-json'); }
-const store = () => USE_PG ? pg() : json();
+export { getStorage } from './storage';
 
-/* Users */
-export const getUser         = async (id: string): Promise<User | null> => (await store()).getUser(id);
-export const getUserByEmail  = async (e: string): Promise<User | null> => (await store()).getUserByEmail(e);
-export const saveUser        = async (u: User):   Promise<void>         => (await store()).saveUser(u);
-export const updateUser      = async (id: string, patch: Partial<User>): Promise<void> => (await store()).updateUser(id, patch);
+export async function getCollections(userId: string): Promise<Collection[]> {
+  return getStorage().getCollections(userId);
+}
 
-/* Collections */
-export const getCollections   = async (uid: string): Promise<Collection[]>    => (await store()).getCollections(uid);
-export const getCollection    = async (id: string):  Promise<Collection|null> => (await store()).getCollection(id);
-export const saveCollection   = async (c: Collection): Promise<void>          => (await store()).saveCollection(c);
-export const updateCollection = async (id: string, patch: Partial<Collection>): Promise<void> => (await store()).updateCollection(id, patch);
-export const deleteCollection = async (id: string): Promise<void>             => (await store()).deleteCollection(id);
+export async function createCollection(c: Collection): Promise<Collection> {
+  return getStorage().createCollection(c);
+}
 
-/* Documents */
-export const getDocuments = async (uid: string, colId?: string): Promise<DocumentMeta[]>    => (await store()).getDocuments(uid, colId);
-export const getDocument  = async (id: string):                   Promise<DocumentMeta|null> => (await store()).getDocument(id);
-export const saveDocument = async (d: DocumentMeta): Promise<void>                           => (await store()).saveDocument(d);
-export const deleteDocument = async (id: string):    Promise<void>                           => (await store()).deleteDocument(id);
+export async function deleteCollection(userId: string, id: string): Promise<void> {
+  return getStorage().deleteCollection(userId, id);
+}
 
-/* Chunks */
-export const addChunks    = async (chunks: Chunk[]): Promise<void> => (await store()).addChunks(chunks);
-export const deleteChunks = async (docId: string):  Promise<void>  => (await store()).deleteChunks(docId);
+export async function getDocuments(
+  userId: string,
+  collectionId?: string,
+): Promise<DocumentMeta[]> {
+  return getStorage().getDocuments(userId, collectionId);
+}
 
-/* Vector search */
-export const search = async (
-  qEmbed: number[],
-  opts:   { userId: string; collectionId?: string; topK?: number },
-): Promise<Citation[]> => (await store()).search(qEmbed, opts);
+export async function saveDocument(doc: DocumentMeta): Promise<void> {
+  return getStorage().saveDocument(doc);
+}
+
+export async function deleteDocument(userId: string, id: string): Promise<void> {
+  return getStorage().deleteDocument(userId, id);
+}
+
+export async function addChunks(chunks: Chunk[]): Promise<void> {
+  return getStorage().addChunks(chunks);
+}
+
+export async function search(
+  queryEmbedding: number[],
+  opts: { userId: string; collectionId?: string; topK?: number },
+): Promise<Citation[]> {
+  return getStorage().search(queryEmbedding, opts);
+}

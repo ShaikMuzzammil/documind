@@ -1,436 +1,412 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { motion, useInView } from 'framer-motion';
-import FeatureShowcase from '@/components/landing/FeatureShowcase';
+import { motion } from 'framer-motion';
 import {
-  BookOpen, Upload, Zap, Layers, ArrowRight, Shield,
-  BarChart3, Download, Brain, Search, Sparkles,
-  ChevronDown, ChevronUp, MessageSquare, FolderOpen,
-  FileText, CheckCircle2, Play, Database, Lock,
-  Cpu, RefreshCw, FileJson, Network,
+  ArrowRight,
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  FileSearch,
+  FileText,
+  FolderOpen,
+  Layers,
+  Lock,
+  MessageSquare,
+  Quote,
+  Search,
+  Shield,
+  Upload,
+  Zap,
 } from 'lucide-react';
+import Logo from '@/components/shared/Logo';
 
-/* ── Animated counter ─────────────────────────────────────────────────────── */
-function Counter({ to, label }: { to: string; label: string }) {
-  const ref    = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true });
-  return (
-    <div ref={ref} className="text-center">
-      <motion.p initial={{ opacity: 0, y: 12 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.5, delay: 0.1 }}
-        className="text-3xl sm:text-4xl font-bold gradient-text">
-        {inView ? to : '0'}
-      </motion.p>
-      <p className="text-xs text-text-muted mt-1">{label}</p>
-    </div>
-  );
-}
-
-/* ── FAQ item ─────────────────────────────────────────────────────────────── */
-function FAQ({ q, a }: { q: string; a: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="border-b border-border">
-      <button onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between py-4 text-left text-sm font-medium text-text-primary hover:text-blue-400 transition-colors">
-        {q}
-        {open ? <ChevronUp className="w-4 h-4 shrink-0 text-blue-400" /> : <ChevronDown className="w-4 h-4 shrink-0 text-text-muted" />}
-      </button>
-      <motion.div initial={false} animate={{ height: open ? 'auto' : 0, opacity: open ? 1 : 0 }}
-        className="overflow-hidden">
-        <p className="pb-4 text-sm text-text-secondary leading-relaxed">{a}</p>
-      </motion.div>
-    </div>
-  );
-}
-
-/* ── Section wrapper ─────────────────────────────────────────────────────── */
-function Section({ id, children, className = '' }: { id: string; children: React.ReactNode; className?: string }) {
-  return (
-    <section id={id} className={`py-20 sm:py-24 px-4 ${className}`}>
-      <div className="max-w-6xl mx-auto">{children}</div>
-    </section>
-  );
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-blue-500/25 bg-blue-500/8 text-blue-400 text-xs font-medium mb-4">
-      <Sparkles className="w-3 h-3" />{children}
-    </span>
-  );
-}
-
-/* ── Terminal animation ───────────────────────────────────────────────────── */
-const DEMO_LINES = [
-  { type: 'user',   text: 'What are the key obligations in the Q3 agreement?' },
-  { type: 'system', text: '↑  Retrieving semantic context from 3 documents…' },
-  { type: 'ai',     text: 'Based on the Q3 agreement (Section 4.2), the key obligations are: (1) payment within 30 days of invoice, (2) quarterly performance reviews, and (3) data confidentiality provisions. [Source: agreement-q3.pdf, p.8]' },
-  { type: 'cite',   text: '📎  3 citations · avg confidence 91%' },
+/* ── Demo terminal strings ──────────────────────────────────────────── */
+const TERMINAL_LINES = [
+  { prefix: 'you',  text: 'What are the key obligations in the Q3 contract?' },
+  { prefix: 'sys',  text: '↑ Searching 4 documents…' },
+  { prefix: 'docs', text: 'Based on Section 4.2 of agreement-q3.pdf, the obligations are: (1) payment within 30 days of invoice, (2) quarterly reviews, (3) data confidentiality. [Sources: agreement-q3.pdf p.8, nda-2024.pdf p.3]' },
+  { prefix: 'cite', text: '3 citations · avg confidence 91%' },
 ];
 
-function Terminal() {
-  const [shown, setShown] = useState(0);
+/* ── Feature cards ──────────────────────────────────────────────────── */
+const FEATURES = [
+  {
+    icon: Upload,
+    title: 'Drag-and-drop uploads',
+    body: 'PDF, Markdown, text, CSV, JSON, and code files. Files are parsed and indexed in seconds.',
+  },
+  {
+    icon: Search,
+    title: 'Meaning-first search',
+    body: 'Find answers by intent, not keywords. Every search considers the full semantic context of your question.',
+  },
+  {
+    icon: Quote,
+    title: 'Source-linked citations',
+    body: 'Every answer traces back to the exact passage it came from. Read, verify, and trust with confidence.',
+  },
+  {
+    icon: Layers,
+    title: 'Project workspaces',
+    body: 'Group documents into collections by project, client, or topic. Questions stay scoped to what matters.',
+  },
+  {
+    icon: Zap,
+    title: 'Streaming responses',
+    body: 'Answers appear word-by-word for a fast, natural reading experience — no waiting for full generation.',
+  },
+  {
+    icon: Shield,
+    title: 'Your data, your keys',
+    body: 'Documents never leave your storage. Answers are generated using your own provider credentials.',
+  },
+];
+
+/* ── Steps ─────────────────────────────────────────────────────────── */
+const STEPS = [
+  {
+    icon: FolderOpen,
+    title: 'Create a collection',
+    body: 'Group related files into a workspace — contracts, research notes, product specs, anything.',
+  },
+  {
+    icon: Upload,
+    title: 'Upload your documents',
+    body: 'Drop in files and they are processed into searchable segments automatically.',
+  },
+  {
+    icon: MessageSquare,
+    title: 'Ask anything',
+    body: 'Ask a plain-language question and get a concise, cited answer from your own documents.',
+  },
+];
+
+/* ── Use-case tiles ─────────────────────────────────────────────────── */
+const USE_CASES = [
+  { icon: FileText,  label: 'Contract review',    hint: 'Instantly surface obligations, deadlines, and liability clauses.' },
+  { icon: BookOpen,  label: 'Research synthesis', hint: 'Cross-reference papers and notes without rereading everything.' },
+  { icon: Lock,      label: 'Compliance checks',  hint: 'Verify policy adherence across a library of internal documents.' },
+  { icon: Clock,     label: 'Meeting prep',       hint: 'Digest briefing packs and reports in minutes, not hours.' },
+  { icon: FileSearch, label: 'Knowledge base',    hint: 'Turn your team docs into an always-available reference.' },
+  { icon: Layers,    label: 'Project tracking',   hint: 'Ask status questions across all linked project files at once.' },
+];
+
+/* ── FAQ items ──────────────────────────────────────────────────────── */
+const FAQ_ITEMS = [
+  {
+    q: 'What kinds of files can I upload?',
+    a: 'PDF, Markdown, plain text, CSV, JSON, and most code file types (.py, .js, .ts, etc.). PDFs are automatically parsed; other formats are read as text.',
+  },
+  {
+    q: 'How are answers verified?',
+    a: 'Every answer is built exclusively from passages retrieved from your own documents. If the answer is not in your files, DocuMind says so rather than guessing. Citations link back to the exact source text.',
+  },
+  {
+    q: 'Is my data private?',
+    a: 'Yes. Your documents are stored in your own database (Postgres + pgvector), and answers are generated using your own credentials. Nothing is sent to a shared DocuMind server.',
+  },
+  {
+    q: 'Can I scope questions to one project?',
+    a: 'Yes. Collections let you group files by project or topic. When you open chat from a collection, search only spans the files in that workspace.',
+  },
+  {
+    q: 'What does deployment cost?',
+    a: 'The app code is free. Costs depend on your choices: your database host (Neon and Supabase both have generous free tiers) and your answer provider (Gemini free tier covers thousands of questions per day).',
+  },
+];
+
+/* ── Animated terminal preview ──────────────────────────────────────── */
+function TerminalDemo() {
+  const [step, setStep] = useState(0);
   useEffect(() => {
-    if (shown >= DEMO_LINES.length) return;
-    const t = setTimeout(() => setShown((v) => v + 1), 900 + shown * 200);
+    if (step >= TERMINAL_LINES.length) return;
+    const delay = step === 0 ? 800 : step === 1 ? 500 : step === 2 ? 1400 : 400;
+    const t = setTimeout(() => setStep((s) => s + 1), delay);
     return () => clearTimeout(t);
-  }, [shown]);
+  }, [step]);
+
+  const prefixClass = (p: string) => {
+    if (p === 'you') return 'text-accent';
+    if (p === 'sys') return 'text-text-muted italic';
+    if (p === 'cite') return 'text-text-muted text-[11px]';
+    return 'text-success';
+  };
 
   return (
-    <div className="terminal-window rounded-2xl overflow-hidden font-mono text-xs sm:text-sm">
-      <div className="flex items-center gap-2 px-4 py-3 bg-white/3 border-b border-white/6">
-        <span className="w-3 h-3 rounded-full bg-red-500/70" />
-        <span className="w-3 h-3 rounded-full bg-yellow-500/70" />
-        <span className="w-3 h-3 rounded-full bg-emerald-500/70" />
-        <span className="ml-2 text-text-muted text-[10px]">DocuMind — Document Intelligence</span>
+    <div className="rounded-2xl border border-border bg-[#0c0e14] overflow-hidden shadow-2xl">
+      <div className="flex items-center gap-1.5 border-b border-border px-4 py-3">
+        <span className="h-3 w-3 rounded-full bg-danger/60" />
+        <span className="h-3 w-3 rounded-full bg-[#f59e0b]/60" />
+        <span className="h-3 w-3 rounded-full bg-success/60" />
+        <span className="ml-3 text-xs text-text-muted font-mono">DocuMind — Document Workspace</span>
       </div>
-      <div className="p-5 space-y-3 min-h-[200px]">
-        {DEMO_LINES.slice(0, shown).map((line, i) => (
-          <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="leading-relaxed">
-            {line.type === 'user'   && <><span className="text-blue-400">you &gt; </span><span className="text-text-primary">{line.text}</span></>}
-            {line.type === 'system' && <span className="text-text-muted italic">{line.text}</span>}
-            {line.type === 'ai'     && <><span className="text-emerald-400">ai  &gt; </span><span className="text-text-secondary">{line.text}</span></>}
-            {line.type === 'cite'   && <span className="text-blue-300/70 text-[11px]">{line.text}</span>}
+      <div className="px-5 py-4 space-y-3 font-mono text-sm min-h-[180px]">
+        {TERMINAL_LINES.slice(0, step).map((line, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className={`leading-relaxed ${prefixClass(line.prefix)}`}
+          >
+            {line.prefix !== 'sys' && line.prefix !== 'cite' && (
+              <span className="font-semibold">{line.prefix === 'you' ? 'you' : 'dm'} &gt; </span>
+            )}
+            {line.text}
           </motion.div>
         ))}
-        {shown < DEMO_LINES.length && (
-          <span className="inline-block w-2 h-4 bg-blue-400 animate-pulse" />
+        {step < TERMINAL_LINES.length && (
+          <span className="inline-block w-2 h-4 bg-accent animate-pulse rounded-sm" />
         )}
       </div>
     </div>
   );
 }
 
-/* ── Page ─────────────────────────────────────────────────────────────────── */
+/* ── FAQ accordion ──────────────────────────────────────────────────── */
+function FAQAccordion() {
+  const [open, setOpen] = useState<number | null>(0);
+  return (
+    <div className="space-y-3">
+      {FAQ_ITEMS.map((item, i) => (
+        <div key={item.q} className="glass rounded-xl overflow-hidden">
+          <button
+            onClick={() => setOpen(open === i ? null : i)}
+            className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left"
+          >
+            <span className="font-medium text-sm">{item.q}</span>
+            <ChevronDown
+              className={`w-4 h-4 text-text-muted shrink-0 transition-transform ${open === i ? 'rotate-180' : ''}`}
+            />
+          </button>
+          {open === i && (
+            <p className="px-5 pb-4 text-sm text-text-secondary leading-relaxed">{item.a}</p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── Page ───────────────────────────────────────────────────────────── */
 export default function HomePage() {
   return (
-    <div className="overflow-x-hidden">
+    <>
+      {/* Hero */}
+      <section className="relative hero-glow pt-32 pb-24 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-soft border border-accent/20 text-accent text-xs font-medium mb-6"
+          >
+            <Logo className="w-3.5 h-3.5" animated={false} />
+            Intelligent Document Workspace
+          </motion.div>
 
-      {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="relative min-h-[90vh] flex flex-col items-center justify-center px-4 pt-8 pb-16 hero-glow grid-bg">
-        <div className="absolute inset-0 grid-bg opacity-40 pointer-events-none" />
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.06 }}
+            className="text-4xl sm:text-6xl font-bold tracking-tight leading-[1.1]"
+          >
+            Turn any document into an
+            <br />
+            <span className="gradient-text">expert you can question.</span>
+          </motion.h1>
 
-        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
-          className="relative z-10 text-center max-w-4xl mx-auto">
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.13 }}
+            className="mt-6 text-lg text-text-secondary max-w-2xl mx-auto leading-relaxed"
+          >
+            Upload PDFs, contracts, research notes, or code. Ask anything in plain language.
+            Get concise, <strong className="text-text-primary font-semibold">source-cited answers</strong> grounded in your own files.
+          </motion.p>
 
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-blue-500/25 bg-blue-500/8 text-blue-400 text-xs font-medium mb-6 badge-glow">
-            <Sparkles className="w-3 h-3" />Intelligent Document Workspace
-          </div>
-
-          <h1 className="text-4xl sm:text-6xl font-bold leading-tight tracking-tight">
-            Turn Any Document Into an<br />
-            <span className="gradient-text-warm">Expert You Can Question</span>
-          </h1>
-
-          <p className="mt-6 text-text-secondary text-lg sm:text-xl max-w-2xl mx-auto leading-relaxed">
-            Upload PDFs, research papers, contracts, or code. Ask anything in plain language.
-            Get <strong className="text-text-primary">grounded, cited answers</strong> from your own data — nothing hallucinated.
-          </p>
-
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/auth"
-              className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 hover:bg-blue-500 px-7 py-3.5 text-sm font-semibold text-white transition-all shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 hover:scale-[1.02]">
-              Start for Free <ArrowRight className="w-4 h-4" />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mt-8 flex flex-wrap items-center justify-center gap-3"
+          >
+            <Link
+              href="/auth"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
+            >
+              Start for free <ArrowRight className="w-4 h-4" />
             </Link>
-            <a href="#how"
-              className="inline-flex items-center gap-2 rounded-2xl border border-border bg-bg-card hover:bg-bg-hover px-7 py-3.5 text-sm font-medium text-text-secondary transition-all hover:scale-[1.01]">
-              See how it works <Play className="w-3.5 h-3.5" />
+            <a
+              href="#how"
+              className="inline-flex items-center gap-2 px-6 py-3 glass rounded-xl font-medium hover:bg-white/5 transition-colors"
+            >
+              See how it works <ChevronRight className="w-4 h-4" />
             </a>
-          </div>
-        </motion.div>
+          </motion.div>
 
-        {/* Terminal */}
-        <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.3 }}
-          className="relative z-10 mt-14 w-full max-w-2xl mx-auto">
-          <Terminal />
-        </motion.div>
+          {/* Stats row */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.35 }}
+            className="mt-14 flex flex-wrap justify-center gap-8 text-center"
+          >
+            {[
+              { value: '< 1s', label: 'Average retrieval time' },
+              { value: '99.9%', label: 'Citation accuracy' },
+              { value: '∞', label: 'Documents per workspace' },
+              { value: '768-dim', label: 'Semantic vector index' },
+            ].map(({ value, label }) => (
+              <div key={label} className="min-w-[100px]">
+                <p className="text-2xl font-bold gradient-text">{value}</p>
+                <p className="text-xs text-text-muted mt-1">{label}</p>
+              </div>
+            ))}
+          </motion.div>
+        </div>
 
-        {/* Stats */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.8 }}
-          className="relative z-10 mt-14 grid grid-cols-2 sm:grid-cols-4 gap-8 max-w-2xl mx-auto">
-          <Counter to="768-dim" label="Embedding precision" />
-          <Counter to="< 1s"    label="First token latency" />
-          <Counter to="99.9%"   label="Source accuracy"     />
-          <Counter to="∞"       label="Documents supported" />
+        {/* Terminal demo */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="max-w-2xl mx-auto mt-16"
+        >
+          <TerminalDemo />
         </motion.div>
       </section>
 
-      <hr className="section-divider" />
-
-      {/* ── How it Works ─────────────────────────────────────────────────── */}
-      <Section id="how">
-        <div className="text-center mb-14">
-          <SectionLabel>Process</SectionLabel>
-          <h2 className="text-3xl sm:text-4xl font-bold">From upload to insight in seconds</h2>
-          <p className="mt-3 text-text-secondary max-w-xl mx-auto">
-            Three steps from raw files to conversational intelligence with full source traceability.
-          </p>
-        </div>
-
-        <div className="grid sm:grid-cols-3 gap-6">
-          {[
-            {
-              step: '01', icon: Upload, title: 'Upload Your Documents',
-              desc: 'Drop PDFs, text files, Markdown, CSVs, JSON, or source code. Batch uploads supported with per-file progress tracking.',
-              color: 'blue',
-            },
-            {
-              step: '02', icon: Brain, title: 'Intelligent Indexing',
-              desc: 'Documents are semantically chunked and embedded into a 768-dimensional vector space for precise similarity retrieval.',
-              color: 'emerald',
-            },
-            {
-              step: '03', icon: MessageSquare, title: 'Ask & Extract',
-              desc: 'Query across all documents or a specific collection. Every answer is grounded with direct citations and confidence scores.',
-              color: 'blue',
-            },
-          ].map(({ step, icon: Icon, title, desc, color }) => (
-            <motion.div key={step} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-              className="glass rounded-2xl p-6 card-glow relative overflow-hidden">
-              <div className="absolute top-3 right-4 text-5xl font-black text-white/3 select-none">{step}</div>
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${
-                color === 'blue' ? 'bg-blue-600/15 border border-blue-500/25 text-blue-400' : 'bg-emerald-500/15 border border-emerald-500/25 text-emerald-400'
-              }`}>
-                <Icon className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-semibold mb-2">{title}</h3>
-              <p className="text-sm text-text-secondary leading-relaxed">{desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </Section>
-
-      <hr className="section-divider" />
-
-      {/* ── Features ─────────────────────────────────────────────────────── */}
-      <Section id="features" className="bg-bg-secondary/20">
-        <div className="text-center mb-14">
-          <SectionLabel>Features</SectionLabel>
-          <h2 className="text-3xl sm:text-4xl font-bold">Everything your documents need</h2>
-          <p className="mt-3 text-text-secondary max-w-xl mx-auto">Built for researchers, legal professionals, engineers, and analysts.</p>
-        </div>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {[
-            { icon: Search,       title: 'Semantic Search',       desc: 'Find conceptual matches, not just keywords. Understands meaning and context across all your documents.' },
-            { icon: CheckCircle2, title: 'Verified Citations',    desc: 'Every AI response links directly to its source chunk with confidence scores — no unverifiable claims.' },
-            { icon: FolderOpen,   title: 'Smart Collections',     desc: 'Organize documents into topic collections. Chat with one collection or search across all at once.' },
-            { icon: BarChart3,    title: 'Analytics Dashboard',   desc: 'Track document health, chunk coverage, file type breakdown, and collection-level storage insights.' },
-            { icon: FileJson,     title: 'Schema Extraction',     desc: 'Define a JSON schema and batch-extract structured fields from an entire collection automatically.' },
-            { icon: Download,     title: 'Multi-Format Export',   desc: 'Export documents as CSV, collections as JSON, chat sessions as Markdown — one click.' },
-            { icon: Lock,         title: 'Private Workspace',     desc: 'Every user has a fully isolated data space. No cross-user data leakage, ever.' },
-            { icon: Layers,       title: 'Multi-File Upload',     desc: 'Upload multiple files at once with real-time per-file progress tracking and status logs.' },
-            { icon: RefreshCw,    title: 'Auto Re-ranking',       desc: 'Retrieved chunks are scored and ranked by true relevance before generating the final answer.' },
-          ].map(({ icon: Icon, title, desc }) => (
-            <motion.div key={title} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-              className="glass rounded-2xl p-5 card-glow transition-all">
-              <div className="w-9 h-9 rounded-xl bg-blue-600/12 border border-blue-500/20 flex items-center justify-center mb-3">
-                <Icon className="w-4 h-4 text-blue-400" />
-              </div>
-              <h3 className="text-sm font-semibold mb-1.5">{title}</h3>
-              <p className="text-xs text-text-secondary leading-relaxed">{desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </Section>
-
-
-      {/* ── Feature Showcase ─────────────────────────────────────────────── */}
-      <Section id="showcase" className="bg-bg-secondary/20">
-        <div className="text-center mb-10">
-          <SectionLabel>Interactive Demo</SectionLabel>
-          <h2 className="text-3xl sm:text-4xl font-bold">See every feature in action</h2>
-          <p className="mt-3 text-text-secondary max-w-xl mx-auto">
-            Explore the full capabilities of DocuMind — from chat citations to PII scanning.
-          </p>
-        </div>
-        <FeatureShowcase />
-      </Section>
-
-      <hr className="section-divider" />
-
-      {/* ── Capabilities ─────────────────────────────────────────────────── */}
-      <Section id="capabilities">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <SectionLabel>Advanced Capabilities</SectionLabel>
-            <h2 className="text-3xl sm:text-4xl font-bold leading-tight">
-              Production-grade RAG<br />architecture inside
-            </h2>
-            <p className="mt-4 text-text-secondary leading-relaxed">
-              DocuMind implements a multi-stage retrieval pipeline: semantic chunking → high-dimensional vector embedding → approximate nearest-neighbour search → re-ranking → citation-grounded generation.
+      {/* Features */}
+      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 scroll-mt-20">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-3">Everything you need to understand documents faster</h2>
+            <p className="text-text-secondary max-w-2xl mx-auto">
+              A complete retrieval pipeline from upload to answer — built to stay out of your way.
             </p>
-            <ul className="mt-6 space-y-3">
-              {[
-                { icon: Cpu,      text: 'Vector similarity search over 768-dimensional embeddings' },
-                { icon: Network,  text: 'Semantic chunking respects document structure and boundaries' },
-                { icon: Shield,   text: 'Per-user namespace isolation prevents cross-workspace leakage' },
-                { icon: Database, text: 'PostgreSQL + pgvector or local JSON store — your choice' },
-                { icon: Brain,    text: 'Query expansion improves recall for vague or short questions' },
-                { icon: Zap,      text: 'Server-Sent Events for sub-second streaming token delivery' },
-              ].map(({ icon: Icon, text }) => (
-                <li key={text} className="flex items-start gap-3 text-sm text-text-secondary">
-                  <Icon className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />{text}
-                </li>
-              ))}
-            </ul>
-            <Link href="/auth"
-              className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-blue-600 hover:bg-blue-500 px-6 py-3 text-sm font-semibold text-white transition-colors">
-              Try it now <ArrowRight className="w-4 h-4" />
-            </Link>
           </div>
-
-          {/* Pipeline visual */}
-          <div className="glass rounded-2xl p-6 space-y-3">
-            {[
-              { step: 'Ingest',   desc: 'Parse PDF, text, code → extract raw text', color: 'blue'    },
-              { step: 'Chunk',    desc: 'Semantic boundary detection → 512-token pieces', color: 'blue' },
-              { step: 'Embed',    desc: '768-dim vector per chunk via embedding model', color: 'emerald' },
-              { step: 'Index',    desc: 'Store in pgvector with IVFFlat ANN index',    color: 'emerald' },
-              { step: 'Retrieve', desc: 'cosine similarity top-K with namespace filter', color: 'blue'  },
-              { step: 'Generate', desc: 'LLM with context → cited streamed answer',    color: 'emerald' },
-            ].map(({ step, desc, color }, i) => (
-              <div key={step} className="flex items-center gap-3">
-                <span className={`text-xs font-mono font-bold w-16 shrink-0 ${color === 'blue' ? 'text-blue-400' : 'text-emerald-400'}`}>
-                  {String(i + 1).padStart(2, '0')} {step}
-                </span>
-                <div className="flex-1 h-px bg-border" />
-                <span className="text-xs text-text-muted text-right max-w-[200px]">{desc}</span>
-              </div>
-            ))}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {FEATURES.map((f, i) => {
+              const Icon = f.icon;
+              return (
+                <motion.div
+                  key={f.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.05 }}
+                  className="glass rounded-2xl p-6 hover:border-accent/20 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-accent-soft border border-accent/20 flex items-center justify-center mb-4">
+                    <Icon className="w-5 h-5 text-accent" />
+                  </div>
+                  <h3 className="font-semibold mb-2">{f.title}</h3>
+                  <p className="text-sm text-text-secondary leading-relaxed">{f.body}</p>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
-      </Section>
+      </section>
 
-      <hr className="section-divider" />
-
-      {/* ── Guide ────────────────────────────────────────────────────────── */}
-      <Section id="guide" className="bg-bg-secondary/20">
-        <div className="text-center mb-14">
-          <SectionLabel>Quick Start Guide</SectionLabel>
-          <h2 className="text-3xl sm:text-4xl font-bold">Up and running in 4 steps</h2>
-        </div>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {[
-            {
-              num: 1, icon: BookOpen, title: 'Create Account',
-              desc: 'Sign up with your email. No credit card required. Your workspace is created instantly.',
-            },
-            {
-              num: 2, icon: FolderOpen, title: 'Create a Collection',
-              desc: 'Group related documents into a named collection — e.g. "Legal Contracts Q3" or "Research Papers".',
-            },
-            {
-              num: 3, icon: Upload, title: 'Upload Documents',
-              desc: 'Drag-drop or browse for files. PDF, TXT, Markdown, CSV, JSON, code — all supported simultaneously.',
-            },
-            {
-              num: 4, icon: MessageSquare, title: 'Start Chatting',
-              desc: 'Ask questions in plain language. Answers reference specific passages with expandable source previews.',
-            },
-          ].map(({ num, icon: Icon, title, desc }) => (
-            <motion.div key={num} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-              transition={{ delay: num * 0.08 }}
-              className="glass rounded-2xl p-6 text-center card-glow">
-              <div className="w-12 h-12 rounded-2xl bg-blue-600/15 border border-blue-500/25 flex items-center justify-center mx-auto mb-4">
-                <Icon className="w-6 h-6 text-blue-400" />
-              </div>
-              <div className="text-xs font-mono text-text-muted mb-2">Step {num}</div>
-              <h3 className="text-sm font-semibold mb-2">{title}</h3>
-              <p className="text-xs text-text-secondary leading-relaxed">{desc}</p>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Use cases */}
-        <div className="mt-14">
-          <h3 className="text-xl font-bold text-center mb-8">Built for every knowledge workflow</h3>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { icon: FileText,    label: 'Legal',      desc: 'Review contracts, extract clauses, compare obligations across documents.' },
-              { icon: Brain,       label: 'Research',   desc: 'Cross-reference papers, surface contradictions, extract citations.' },
-              { icon: BarChart3,   label: 'Finance',    desc: 'Analyse reports, extract figures, track covenants across filings.' },
-              { icon: Layers,      label: 'Engineering',desc: 'Chat with codebases, API docs, runbooks, and architecture specs.' },
-            ].map(({ icon: Icon, label, desc }) => (
-              <div key={label} className="rounded-2xl border border-border bg-bg-card p-4 hover:border-blue-500/25 transition-colors card-glow">
-                <Icon className="w-5 h-5 text-blue-400 mb-2" />
-                <p className="text-sm font-semibold mb-1">{label}</p>
-                <p className="text-xs text-text-muted leading-relaxed">{desc}</p>
-              </div>
-            ))}
+      {/* How it works */}
+      <section id="how" className="py-20 px-4 sm:px-6 lg:px-8 bg-bg-secondary/40 scroll-mt-20">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-3">Get answers in three steps</h2>
+            <p className="text-text-secondary">From upload to verified insight in under a minute.</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {STEPS.map((s, i) => {
+              const Icon = s.icon;
+              return (
+                <div key={s.title} className="relative glass rounded-2xl p-6">
+                  <div className="absolute -top-4 left-5 w-8 h-8 rounded-full bg-accent text-white text-sm font-bold flex items-center justify-center shadow-lg">
+                    {i + 1}
+                  </div>
+                  <Icon className="w-6 h-6 text-accent mt-2 mb-4" />
+                  <h3 className="font-semibold mb-2">{s.title}</h3>
+                  <p className="text-sm text-text-secondary leading-relaxed">{s.body}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
-      </Section>
+      </section>
 
-      <hr className="section-divider" />
-
-      {/* ── FAQ ──────────────────────────────────────────────────────────── */}
-      <Section id="faq">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-10">
-            <SectionLabel>FAQ</SectionLabel>
-            <h2 className="text-3xl font-bold">Frequently Asked Questions</h2>
+      {/* Use cases */}
+      <section id="guide" className="py-20 px-4 sm:px-6 lg:px-8 scroll-mt-20">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-3">Built for real document work</h2>
+            <p className="text-text-secondary max-w-xl mx-auto">
+              Any domain where you need to find a specific fact across many pages is a fit.
+            </p>
           </div>
-          {[
-            {
-              q: 'What types of files can I upload?',
-              a: 'PDF, plain text (.txt), Markdown (.md), CSV, JSON, TypeScript, JavaScript, Python, HTML, and XML files are all supported. Maximum 20 MB per file.',
-            },
-            {
-              q: 'How accurate are the answers?',
-              a: 'Every answer is generated using only text retrieved from your own documents, not from general knowledge. Each citation includes a confidence score so you can verify exactly which passage was used.',
-            },
-            {
-              q: 'Is my data private?',
-              a: 'Yes. Every user has a fully isolated data namespace. Your documents, embeddings, and chat history are never shared with or visible to other users.',
-            },
-            {
-              q: 'What is the Schema Extraction feature?',
-              a: 'Schema Extraction lets you define a JSON schema (field name + type + description) and automatically extract those fields from every document in a collection — outputting a structured CSV or JSON report.',
-            },
-            {
-              q: 'Do I need a database to use DocuMind?',
-              a: 'No. If no database is configured, DocuMind automatically uses a local JSON file store — perfect for development and demos. For production, connect a PostgreSQL database with the pgvector extension for best performance at scale.',
-            },
-            {
-              q: 'Can I export my data?',
-              a: 'Yes. You can export your full document index as CSV, all collection metadata as JSON, and individual chat sessions as Markdown files — all from the Export page.',
-            },
-          ].map((item) => <FAQ key={item.q} {...item} />)}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {USE_CASES.map((uc, i) => {
+              const Icon = uc.icon;
+              return (
+                <motion.div
+                  key={uc.label}
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.05 }}
+                  className="flex items-start gap-3 glass rounded-xl p-4"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-accent-soft flex items-center justify-center shrink-0 mt-0.5">
+                    <Icon className="w-4.5 h-4.5 text-accent" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm">{uc.label}</p>
+                    <p className="text-xs text-text-muted mt-0.5 leading-relaxed">{uc.hint}</p>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
         </div>
-      </Section>
+      </section>
 
-      <hr className="section-divider" />
+      {/* FAQ */}
+      <section id="faq" className="py-20 px-4 sm:px-6 lg:px-8 bg-bg-secondary/40 scroll-mt-20">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-10">Frequently asked questions</h2>
+          <FAQAccordion />
+        </div>
+      </section>
 
-      {/* ── CTA ──────────────────────────────────────────────────────────── */}
-      <Section id="cta">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-          className="cta-gradient rounded-3xl px-8 py-14 text-center max-w-3xl mx-auto">
-          <div className="w-14 h-14 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center mx-auto mb-6">
-            <BookOpen className="w-7 h-7 text-blue-400" />
+      {/* CTA + footer */}
+      <footer className="border-t border-border py-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2.5 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-accent-soft border border-accent/30 flex items-center justify-center">
+              <Logo className="h-5 w-5" animated />
+            </div>
+            <span className="font-bold text-lg">
+              Docu<span className="gradient-text">Mind</span>
+            </span>
           </div>
-          <h2 className="text-3xl sm:text-4xl font-bold">Ready to query your documents?</h2>
-          <p className="mt-4 text-text-secondary max-w-md mx-auto leading-relaxed">
-            Create your private workspace, upload your first document, and ask your first question — in under two minutes.
+          <h2 className="text-2xl font-bold mb-4">Ready to understand your documents?</h2>
+          <p className="text-text-secondary mb-8 max-w-md mx-auto">
+            Create a free account and start asking questions of your own files today.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3 justify-center">
-            <Link href="/auth"
-              className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 hover:bg-blue-500 px-8 py-3.5 text-sm font-semibold text-white transition-all shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 hover:scale-[1.02]">
-              Create your workspace <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-          <p className="mt-4 text-xs text-text-muted">No credit card required · Private workspace · All formats supported</p>
-        </motion.div>
-      </Section>
-
-      {/* Footer */}
-      <footer className="border-t border-border py-8 px-4 text-center text-xs text-text-muted">
-        <p>DocuMind © {new Date().getFullYear()} — Document Intelligence Platform</p>
-        <p className="mt-1">Built with Next.js · Vector Search · Semantic AI</p>
+          <Link
+            href="/auth"
+            className="inline-flex items-center gap-2 px-8 py-3.5 bg-accent text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
+          >
+            Open DocuMind <ArrowRight className="w-4 h-4" />
+          </Link>
+          <p className="mt-10 text-xs text-text-muted">
+            DocuMind — Open-source document workspace · Built with Next.js 16
+          </p>
+        </div>
       </footer>
-    </div>
+    </>
   );
 }

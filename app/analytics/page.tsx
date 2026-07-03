@@ -1,199 +1,191 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import {
+  BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, CartesianGrid,
+} from 'recharts';
+import {
+  AlertCircle, BarChart3, CheckCircle2, FileText, FolderOpen,
+  Layers, RefreshCw, TrendingUp,
+} from 'lucide-react';
 import AuthGate from '@/components/app/AuthGate';
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { CheckCircle2, AlertCircle, Loader2, BarChart3, RefreshCw, FileText, FolderOpen, Database, Cpu } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { WorkspaceStats } from '@/lib/analytics';
+import { relativeTime } from '@/lib/utils';
 
-interface AnalyticsData {
-  summary: {
-    totalDocuments: number; totalCollections: number; totalChunks: number;
-    totalSize: string; readyCount: number; errorCount: number; processingCount: number;
-    aiConnected: boolean; dbConnected: boolean;
-  };
-  typeBreakdown:   { type: string; count: number }[];
-  collectionStats: { id: string; name: string; docCount: number; chunkCount: number; sizeLabel: string }[];
-  recentDocuments: { id: string; name: string; status: string; chunkCount: number; sizeLabel: string; createdAt: string; collection: string }[];
+const COLORS = ['#6366f1', '#22d3ee', '#34d399', '#f59e0b', '#f87171', '#a78bfa'];
+
+function fmt(bytes: number) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(2) + ' MB';
 }
 
-const PALETTE = ['#2563eb','#10b981','#f59e0b','#8b5cf6','#f87171','#06b6d4','#ec4899'];
-
-function StatCard({ icon: Icon, label, value, sub, color = 'blue' }: {
-  icon: React.ElementType; label: string; value: string | number; sub?: string; color?: string;
-}) {
-  const colors: Record<string,string> = {
-    blue:    'text-blue-400 bg-blue-500/10 border-blue-500/25',
-    emerald: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25',
-    amber:   'text-amber-400 bg-amber-500/10 border-amber-500/25',
-    red:     'text-red-400 bg-red-500/10 border-red-500/25',
-  };
-  return (
-    <div className="glass rounded-2xl p-5 card-glow">
-      <div className={`w-10 h-10 rounded-xl border flex items-center justify-center mb-3 ${colors[color]}`}>
-        <Icon className="w-5 h-5" />
-      </div>
-      <p className="text-2xl font-bold">{value}</p>
-      <p className="text-sm font-medium text-text-secondary mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-text-muted mt-0.5">{sub}</p>}
-    </div>
-  );
+interface Capabilities {
+  aiAnswers: boolean;
+  database: string;
+  email: boolean;
 }
 
-export default function AnalyticsPage() { return <AuthGate><AnalyticsInner /></AuthGate>; }
-
-function AnalyticsInner() {
-  const [data,    setData]    = useState<AnalyticsData | null>(null);
+export default function AnalyticsPage() {
+  const [stats, setStats] = useState<WorkspaceStats | null>(null);
+  const [caps, setCaps] = useState<Capabilities | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState('');
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
-    setLoading(true); setError('');
+    setLoading(true);
+    setError('');
     try {
-      const res = await fetch('/api/analytics');
-      if (!res.ok) throw new Error('Failed to load analytics');
-      setData(await res.json());
-    } catch (err) { setError(err instanceof Error ? err.message : 'Error'); }
-    finally { setLoading(false); }
+      const res = await fetch('/api/stats');
+      if (!res.ok) throw new Error('Could not load workspace data.');
+      const data = await res.json();
+      setStats(data.stats);
+      setCaps(data.capabilities);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load analytics.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return (
-    <div className="flex justify-center items-center h-[calc(100vh-8rem)]">
-      <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
-    </div>
-  );
-  if (error || !data) return (
-    <div className="flex justify-center items-center h-[calc(100vh-8rem)]">
-      <p className="text-sm text-danger">{error || 'No data'}</p>
-    </div>
-  );
-
-  const { summary, typeBreakdown, collectionStats, recentDocuments } = data;
-
   return (
-    <div className="max-w-6xl mx-auto px-4 py-7">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Analytics</h1>
-          <p className="text-sm text-text-muted mt-0.5">Workspace health and document insights</p>
-        </div>
-        <button onClick={load}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-bg-card text-text-secondary text-xs font-medium hover:bg-bg-hover transition-colors">
-          <RefreshCw className="w-3.5 h-3.5" />Refresh
-        </button>
-      </div>
-
-      {/* Summary cards */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={FileText}   label="Documents"   value={summary.totalDocuments}   sub={`${summary.readyCount} ready`} color="blue" />
-        <StatCard icon={FolderOpen} label="Collections" value={summary.totalCollections}  color="emerald" />
-        <StatCard icon={BarChart3}  label="Chunks"      value={summary.totalChunks}       sub="semantic segments" color="amber" />
-        <StatCard icon={Database}   label="Storage"     value={summary.totalSize}         color="blue" />
-      </motion.div>
-
-      {/* System status */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        {[
-          { icon: Cpu,      label: 'AI Engine',  ok: summary.aiConnected, okText: 'Connected',      failText: 'Key not configured' },
-          { icon: Database, label: 'Vector DB',  ok: summary.dbConnected, okText: 'PostgreSQL + pgvector', failText: 'Using local JSON store' },
-        ].map(({ icon: Icon, label, ok, okText, failText }) => (
-          <div key={label} className={`flex items-center gap-3 rounded-xl border p-4 ${ok ? 'border-emerald-500/25 bg-emerald-500/5' : 'border-amber-500/25 bg-amber-500/5'}`}>
-            <Icon className={`w-5 h-5 shrink-0 ${ok ? 'text-emerald-400' : 'text-amber-400'}`} />
-            <div className="flex-1">
-              <p className="text-sm font-medium">{label}</p>
-              <p className={`text-xs ${ok ? 'text-emerald-400' : 'text-amber-400'}`}>{ok ? okText : failText}</p>
+    <AuthGate>
+      <div className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8 pb-24 lg:pb-8">
+        <div className="mx-auto max-w-7xl space-y-6">
+          <header className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-mono font-bold tracking-widest text-text-muted">WORKSPACE</p>
+              <h1 className="mt-1 text-3xl font-bold tracking-tight">Analytics</h1>
+              <p className="mt-1 text-sm text-text-secondary">Workspace health and document insights</p>
             </div>
-            {ok ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-amber-400" />}
-          </div>
-        ))}
-      </div>
+            <button onClick={load} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-bg-card px-3 text-sm text-text-secondary hover:text-text-primary transition-colors">
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Collection bar chart */}
-        <div className="glass rounded-2xl p-5">
-          <p className="text-sm font-semibold mb-4">Documents per Collection</p>
-          {collectionStats.length === 0 ? (
-            <p className="text-xs text-text-muted py-8 text-center">No data yet</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={collectionStats} margin={{ left: -20 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#8a96b8' }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#8a96b8' }} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={{ background: '#0f1726', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, fontSize: 11 }}
-                  labelStyle={{ color: '#e4eaf7' }} itemStyle={{ color: '#3b82f6' }}
-                />
-                <Bar dataKey="docCount" fill="#2563eb" radius={[4,4,0,0]} name="Documents" />
-                <Bar dataKey="chunkCount" fill="#10b981" radius={[4,4,0,0]} name="Chunks" />
-              </BarChart>
-            </ResponsiveContainer>
+          {error && (
+            <div className="flex gap-2 rounded-xl border border-danger/25 bg-danger/10 px-4 py-3 text-sm text-danger">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              {error}
+            </div>
           )}
-        </div>
 
-        {/* File type pie */}
-        <div className="glass rounded-2xl p-5">
-          <p className="text-sm font-semibold mb-4">File Types</p>
-          {typeBreakdown.length === 0 ? (
-            <p className="text-xs text-text-muted py-8 text-center">No data yet</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={typeBreakdown} dataKey="count" nameKey="type" cx="50%" cy="50%"
-                  innerRadius={55} outerRadius={85} paddingAngle={3}>
-                  {typeBreakdown.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ background: '#0f1726', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, fontSize: 11 }}
-                  itemStyle={{ color: '#e4eaf7' }}
-                />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#8a96b8' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
-
-      {/* Recent documents table */}
-      <div className="glass rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
-          <p className="text-sm font-semibold">Recent Documents</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-border">
-                {['Name','Collection','Chunks','Size','Status','Added'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-text-muted font-medium">{h}</th>
+          {loading && !stats ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {[...Array(4)].map((_, i) => <div key={i} className="glass animate-pulse rounded-xl p-6 h-28" />)}
+            </div>
+          ) : stats ? (
+            <>
+              <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { Icon: FileText, label: 'Documents', value: stats.totals.documents, sub: stats.totals.readyDocuments + ' ready' },
+                  { Icon: FolderOpen, label: 'Collections', value: stats.totals.collections, sub: 'active workspaces' },
+                  { Icon: Layers, label: 'Chunks', value: stats.totals.chunks, sub: 'semantic segments' },
+                  { Icon: TrendingUp, label: 'Storage', value: fmt(stats.totals.bytes), sub: 'indexed content' },
+                ].map(({ Icon, label, value, sub }) => (
+                  <div key={label} className="glass rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-8 h-8 rounded-lg bg-accent-soft border border-accent/20 flex items-center justify-center">
+                        <Icon className="h-4 w-4 text-accent" />
+                      </div>
+                      <span className="text-xs text-text-muted">{label}</span>
+                    </div>
+                    <p className="text-2xl font-bold">{value}</p>
+                    <p className="text-xs text-text-muted mt-0.5">{sub}</p>
+                  </div>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {recentDocuments.map((d) => (
-                <tr key={d.id} className="border-b border-border/50 hover:bg-bg-hover/50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-text-primary max-w-[200px] truncate">{d.name}</td>
-                  <td className="px-4 py-3 text-text-secondary">{d.collection}</td>
-                  <td className="px-4 py-3 text-text-secondary font-mono">{d.chunkCount}</td>
-                  <td className="px-4 py-3 text-text-secondary">{d.sizeLabel}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-1.5 py-0.5 rounded font-medium ${
-                      d.status === 'ready' ? 'text-emerald-400 bg-emerald-500/10' :
-                      d.status === 'error' ? 'text-red-400 bg-red-500/10' :
-                      'text-blue-400 bg-blue-500/10'
-                    }`}>{d.status}</span>
-                  </td>
-                  <td className="px-4 py-3 text-text-muted">{new Date(d.createdAt).toLocaleDateString()}</td>
-                </tr>
-              ))}
-              {recentDocuments.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-text-muted">No documents yet</td></tr>
+              </section>
+
+              {caps && (
+                <section className="grid gap-4 sm:grid-cols-3">
+                  {[
+                    { label: 'Answer Engine', ok: caps.aiAnswers, okText: 'Configured and ready', failText: 'Add LLM_API_KEY to enable answers' },
+                    { label: 'Vector Database', ok: caps.database === 'postgres', okText: 'PostgreSQL + pgvector', failText: 'Using local JSON store (add DATABASE_URL for production)' },
+                    { label: 'Welcome Email', ok: caps.email, okText: 'Resend configured', failText: 'Optional — add RESEND_API_KEY to enable' },
+                  ].map(({ label, ok, okText, failText }) => (
+                    <div key={label} className={`glass rounded-xl p-4 flex items-start gap-3 border ${ok ? 'border-success/20 bg-success/5' : 'border-yellow-500/20 bg-yellow-500/5'}`}>
+                      {ok ? <CheckCircle2 className="h-5 w-5 text-success shrink-0 mt-0.5" /> : <AlertCircle className="h-5 w-5 text-yellow-400 shrink-0 mt-0.5" />}
+                      <div>
+                        <p className="text-sm font-semibold">{label}</p>
+                        <p className={`text-xs mt-0.5 ${ok ? 'text-success' : 'text-yellow-400'}`}>{ok ? okText : failText}</p>
+                      </div>
+                    </div>
+                  ))}
+                </section>
               )}
-            </tbody>
-          </table>
+
+              <section className="grid gap-6 lg:grid-cols-2">
+                <div className="glass rounded-xl p-5">
+                  <h2 className="font-semibold mb-4 flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-accent" /> Documents per collection
+                  </h2>
+                  {stats.collections.length === 0 ? (
+                    <p className="text-sm text-text-muted py-8 text-center">No collections yet</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={stats.collections} margin={{ left: -20 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} />
+                        <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} allowDecimals={false} />
+                        <Tooltip contentStyle={{ background: '#161922', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }} labelStyle={{ color: '#e6e9ef' }} itemStyle={{ color: '#a7adba' }} />
+                        <Bar dataKey="documents" name="Docs" fill="#6366f1" radius={[4,4,0,0]} />
+                        <Bar dataKey="chunks" name="Chunks" fill="#22d3ee" radius={[4,4,0,0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+
+                <div className="glass rounded-xl p-5">
+                  <h2 className="font-semibold mb-4">File types</h2>
+                  {stats.fileTypes.length === 0 ? (
+                    <p className="text-sm text-text-muted py-8 text-center">No documents yet</p>
+                  ) : (
+                    <div className="flex flex-col sm:flex-row items-center gap-6">
+                      <ResponsiveContainer width={160} height={160}>
+                        <PieChart>
+                          <Pie data={stats.fileTypes} dataKey="count" nameKey="type" innerRadius={45} outerRadius={72} paddingAngle={3}>
+                            {stats.fileTypes.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                          </Pie>
+                          <Tooltip contentStyle={{ background: '#161922', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="space-y-2">
+                        {stats.fileTypes.map((ft, i) => (
+                          <div key={ft.type} className="flex items-center gap-2 text-sm">
+                            <span className="inline-block h-3 w-3 rounded-full shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+                            <span className="text-text-secondary font-mono">.{ft.type}</span>
+                            <span className="ml-auto pl-4 font-semibold">{ft.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {stats.recentDocuments.length > 0 && (
+                <section className="glass rounded-xl overflow-hidden">
+                  <div className="border-b border-border px-5 py-4"><h2 className="font-semibold">Recent documents</h2></div>
+                  <div className="divide-y divide-border/60">
+                    {stats.recentDocuments.map((doc) => (
+                      <div key={doc.id} className="flex items-center gap-3 px-5 py-3">
+                        <FileText className="h-4 w-4 text-text-muted shrink-0" />
+                        <span className="flex-1 text-sm truncate">{doc.name}</span>
+                        <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${doc.status === 'ready' ? 'bg-success/10 text-success' : doc.status === 'processing' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-danger/10 text-danger'}`}>{doc.status}</span>
+                        <span className="text-xs text-text-muted shrink-0">{relativeTime(doc.createdAt)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
+          ) : null}
         </div>
       </div>
-    </div>
+    </AuthGate>
   );
 }

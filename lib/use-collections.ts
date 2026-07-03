@@ -1,29 +1,50 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Collection } from '@/lib/types';
+import { Collection } from './types';
 
 export function useCollections() {
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState('');
+  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    setError('');
     try {
       const res = await fetch('/api/collections');
-      if (!res.ok) throw new Error('Failed to load collections');
       const data = await res.json();
-      setCollections(data.collections ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      setCollections(data.collections || []);
+    } catch {
+      setCollections([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
-  return { collections, loading, error, refresh };
+  const create = useCallback(
+    async (name: string, description?: string) => {
+      const res = await fetch('/api/collections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description }),
+      });
+      if (res.ok) await refresh();
+      return res.ok;
+    },
+    [refresh],
+  );
+
+  const remove = useCallback(
+    async (id: string) => {
+      const res = await fetch(`/api/collections/${id}`, { method: 'DELETE' });
+      if (res.ok) await refresh();
+      return res.ok;
+    },
+    [refresh],
+  );
+
+  return { collections, loading, refresh, create, remove };
 }

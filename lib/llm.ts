@@ -1,126 +1,153 @@
-import { Citation } from '@/lib/types';
+// OpenAI-compatible chat client with streaming support (Gemini by default).
+//
+// Returns a ReadableStream of text tokens so the chat UI can render answers as
+// they generate. Falls back to a helpful message when no API key is
+// configured, and never leaks raw provider error bodies or key material to
+// the client.
 
-const API_KEY  = process.env.AI_API_KEY ?? '';
-const MODEL    = process.env.AI_CHAT_MODEL ?? 'gemini-2.0-flash';
-const BASE_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}`;
+import { Citation } from './types';
 
-export type LlmMessage = { role: 'user' | 'model'; parts: { text: string }[] };
+const API_KEY = process.env.LLM_API_KEY;
+const BASE_URL = process.env.LLM_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai';
+const CHAT_MODEL = process.env.LLM_CHAT_MODEL || 'gemini-2.5-flash';
 
-export function buildMessages(question: string, citations: Citation[]): LlmMessage[] {
-  const context = citations.length
-    ? citations.map((c, i) => `[${i + 1}] ${c.documentName}:\n${c.text}`).join('\n\n')
-    : 'No relevant document context found.';
+export function llmConfigured(): boolean {
+  return Boolean(API_KEY);
+}
+
+/** Build the grounded system + user prompt from retrieved citations. */
+export function buildMessages(question: string, citations: Citation[]) {
+  const context = citations
+    .map((c, i) => `[${i + 1}] (from "${c.documentName}")\n${c.text}`)
+    .join('\n\n');
+
+  const system = [
+    'You are the DocuMind retrieval assistant.',
+    'Answer ONLY using the provided context passages.',
+    'Cite sources inline using bracketed numbers like [1], [2] that map to the passages.',
+    "If the answer is not in the context, say you could not find it in the user's documents.",
+    'Be concise, accurate, and never invent facts.',
+  ].join(' ');
+
+  const user = context
+    ? `Context passages:\n\n${context}\n\nQuestion: ${question}`
+    : `Question: ${question}\n\n(No relevant context was found in the documents.)`;
 
   return [
-    {
-      role: 'user',
-      parts: [
-        {
-          text: `You are DocuMind, a precise document intelligence assistant. Answer using ONLY the provided document context. Cite sources as [1], [2], etc. If the context does not contain enough information, say so clearly.\n\n--- DOCUMENT CONTEXT ---\n${context}\n--- END CONTEXT ---\n\nQuestion: ${question}`,
-        },
-      ],
-    },
+    { role: 'system' as const, content: system },
+    { role: 'user' as const, content: user },
   ];
 }
 
-/* Streaming via SSE — returns a ReadableStream<Uint8Array> of token text */
-export async function streamChat(messages: LlmMessage[]): Promise<ReadableStream<Uint8Array>> {
-  if (!API_KEY) {
-    const fallback = 'AI key not configured. Add AI_API_KEY to your environment variables.';
-    return new ReadableStream({
-      start(c) {
-        c.enqueue(new TextEncoder().encode(fallback));
-        c.close();
-      },
-    });
+function friendlyUpstreamMessage(status: number): string {
+  if (status === 429) {
+    return 'The AI is receiving too many requests right now. Please wait a minute and try again.';
   }
-
-  const res = await fetch(`${BASE_URL}:streamGenerateContent?alt=sse&key=${API_KEY}`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents:         messages,
-      generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
-      safetySettings: [
-        { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-      ],
-    }),
-  });
-
-  if (!res.ok || !res.body) {
-    const errText = await res.text().catch(() => '');
-
-    // User-friendly quota message
-    if (res.status === 429) {
-      const friendly =
-        '⚠️ AI quota reached for this key. The free tier limit has been hit. ' +
-        'Please wait a few minutes and try again, or upgrade your AI plan for higher limits.';
-      return new ReadableStream({
-        start(c) {
-          c.enqueue(new TextEncoder().encode(friendly));
-          c.close();
-        },
-      });
-    }
-
-    const errMsg = `AI service error (${res.status}). Please try again.`;
-    console.error('[llm] error:', res.status, errText.slice(0, 300));
-    return new ReadableStream({
-      start(c) {
-        c.enqueue(new TextEncoder().encode(errMsg));
-        c.close();
-      },
-    });
+  if (status === 401 || status === 403) {
+    return 'The AI answer service is not available right now. Retrieval and citations below still work.';
   }
-
-  const encoder = new TextEncoder();
-  const reader  = res.body.getReader();
-  const decoder = new TextDecoder();
-  let   buf     = '';
-
-  return new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) { controller.close(); return; }
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split('\n');
-        buf = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.startsWith('data:')) continue;
-          const json = line.slice(5).trim();
-          if (json === '[DONE]') { controller.close(); return; }
-          try {
-            const chunk = JSON.parse(json);
-            const text  = chunk?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-            if (text) controller.enqueue(encoder.encode(text));
-          } catch { /* skip malformed SSE line */ }
-        }
-        return; // yield control back
-      }
-    },
-    cancel() { reader.cancel(); },
-  });
+  if (status >= 500) {
+    return 'The AI answer service is temporarily unavailable. Please try again shortly.';
+  }
+  return 'The AI could not generate an answer for this question. Please rephrase and try again.';
 }
 
-/* Non-streaming completion for schema extraction */
-export async function completeJSON(prompt: string): Promise<string> {
-  if (!API_KEY) return '{}';
-  const res = await fetch(`${BASE_URL}:generateContent?key=${API_KEY}`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents:         [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
-    }),
-  });
-  if (!res.ok) {
-    if (res.status === 429) throw new Error('QUOTA_EXCEEDED');
-    throw new Error(`AI error ${res.status}`);
+/** Stream a chat completion as plain text tokens. */
+export async function streamChat(
+  messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
+): Promise<ReadableStream<Uint8Array>> {
+  const encoder = new TextEncoder();
+
+  if (!API_KEY) {
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            'AI answers are not turned on for this workspace yet. Open Settings to learn how to enable them - ' +
+              'retrieval and citations below still work without it.',
+          ),
+        );
+        controller.close();
+      },
+    });
   }
-  const data = await res.json();
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${API_KEY}`,
+      },
+      body: JSON.stringify({ model: CHAT_MODEL, messages, stream: true, temperature: 0.2 }),
+    });
+  } catch {
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('Could not reach the AI service. Please check your connection and try again.'));
+        controller.close();
+      },
+    });
+  }
+
+  if (!upstream.ok || !upstream.body) {
+    const message = friendlyUpstreamMessage(upstream.status);
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(message));
+        controller.close();
+      },
+    });
+  }
+
+  // Parse the provider's SSE stream and re-emit only the text deltas.
+  const reader = upstream.body.getReader();
+  const decoder = new TextDecoder();
+
+  return new ReadableStream({
+    async start(controller) {
+      let buffer = '';
+      let emitted = false;
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data:')) continue;
+            const payload = trimmed.slice(5).trim();
+            if (payload === '[DONE]') {
+              controller.close();
+              return;
+            }
+            try {
+              const json = JSON.parse(payload);
+              const token = json.choices?.[0]?.delta?.content;
+              if (token) {
+                emitted = true;
+                controller.enqueue(encoder.encode(token));
+              }
+            } catch {
+              // ignore keep-alive / non-JSON lines
+            }
+          }
+        }
+        if (!emitted) {
+          controller.enqueue(encoder.encode('The AI returned an empty response. Please try rephrasing your question.'));
+        }
+      } catch {
+        if (!emitted) {
+          controller.enqueue(encoder.encode('The AI connection was interrupted. Please try again.'));
+        }
+      } finally {
+        controller.close();
+      }
+    },
+  });
 }

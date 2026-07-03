@@ -1,47 +1,49 @@
+import bcrypt from 'bcryptjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { createSessionToken, getSessionCookieOptions } from '@/lib/auth';
+import { sendWelcomeEmail } from '@/lib/mail';
+import { getStorage } from '@/lib/storage';
 import { generateId } from '@/lib/utils';
-import { hashPassword, createSession } from '@/lib/auth';
-import { getUserByEmail, saveUser } from '@/lib/store';
+
+export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const name     = (body.name     ?? '').toString().trim();
-  const email    = (body.email    ?? '').toString().trim().toLowerCase();
-  const password = (body.password ?? '').toString();
+  const name = (body.name || '').toString().trim();
+  const email = (body.email || '').toString().trim().toLowerCase();
+  const password = (body.password || '').toString();
 
-  if (!name)                 return NextResponse.json({ error: 'Name is required.' },  { status: 400 });
-  if (!email || !email.includes('@'))
-                             return NextResponse.json({ error: 'A valid email address is required.' }, { status: 400 });
-  if (password.length < 8)  return NextResponse.json({ error: 'Password must be at least 8 characters.' }, { status: 400 });
-
-  const existing = await getUserByEmail(email);
-  if (existing) return NextResponse.json({ error: 'An account with this email already exists. Please sign in.' }, { status: 409 });
-
-  const user = {
-    id:           generateId(),
-    name,
-    email,
-    passwordHash: await hashPassword(password),
-    createdAt:    new Date().toISOString(),
-  };
-  await saveUser(user);
-  await createSession(user.id);
-
-  // Optional welcome email
-  if (process.env.RESEND_API_KEY && process.env.EMAIL_FROM) {
-    try {
-      await fetch('https://api.resend.com/emails', {
-        method:  'POST',
-        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          from:    process.env.EMAIL_FROM,
-          to:      email,
-          subject: 'Welcome to DocuMind',
-          html:    `<p>Hi ${name}, welcome to DocuMind! Start by uploading your first document.</p>`,
-        }),
-      });
-    } catch { /* non-critical */ }
+  if (!name || !email || !password) {
+    return NextResponse.json({ error: 'Name, email, and password are required.' }, { status: 400 });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
+  }
+  if (password.length < 8) {
+    return NextResponse.json({ error: 'Password must be at least 8 characters.' }, { status: 400 });
   }
 
-  return NextResponse.json({ success: true });
+  const storage = getStorage();
+  const existing = await storage.getUserByEmail(email);
+  if (existing) {
+    return NextResponse.json({ error: 'An account already exists for this email.' }, { status: 409 });
+  }
+
+  const user = {
+    id: generateId(),
+    email,
+    name,
+    createdAt: new Date().toISOString(),
+  };
+  const passwordHash = await bcrypt.hash(password, 12);
+  await storage.createUser(user, passwordHash);
+
+  sendWelcomeEmail(user).catch((err) => console.warn('welcome email failed', err));
+
+  const response = NextResponse.json({ user }, { status: 201 });
+  response.cookies.set({
+    ...getSessionCookieOptions(),
+    value: createSessionToken(user.id),
+  });
+  return response;
 }

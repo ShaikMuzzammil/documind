@@ -1,188 +1,162 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { usePathname } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import {
-  MessageSquare, FileText, FolderOpen, BarChart3, Download,
-  Settings, Home, LogOut, Search, User, Keyboard, HelpCircle,
-  LayoutDashboard, BookOpen, type LucideIcon,
+  BarChart3,
+  ChevronRight,
+  Download,
+  FileText,
+  FolderOpen,
+  HelpCircle,
+  Home,
+  Layers,
+  LogOut,
+  MessageSquare,
+  Search,
+  Settings,
+  User,
 } from 'lucide-react';
 import { useUser } from '@/lib/use-user';
-import SearchPanel       from '@/components/app/SearchPanel';
-import KeyboardShortcuts from '@/components/app/KeyboardShortcuts';
-import OnboardingModal   from '@/components/app/OnboardingModal';
+import Logo from './Logo';
 
-interface NavItem { href: string; label: string; icon: LucideIcon; }
-
-const NAV_ITEMS: NavItem[] = [
-  { href: '/workspace',   label: 'Dashboard',   icon: LayoutDashboard },
-  { href: '/chat',        label: 'Chat',         icon: MessageSquare   },
-  { href: '/documents',   label: 'Documents',    icon: FileText        },
-  { href: '/collections', label: 'Collections',  icon: FolderOpen      },
-  { href: '/analytics',   label: 'Analytics',    icon: BarChart3       },
-  { href: '/export',      label: 'Export',       icon: Download        },
-  { href: '/search',      label: 'Search',       icon: Search          },
-  { href: '/help',        label: 'Help',         icon: HelpCircle      },
-  { href: '/settings',    label: 'Settings',     icon: Settings        },
+const NAV_ITEMS = [
+  { href: '/chat',        icon: MessageSquare, label: 'Chat'        },
+  { href: '/documents',   icon: FileText,      label: 'Documents'   },
+  { href: '/collections', icon: FolderOpen,    label: 'Collections' },
+  { href: '/analytics',   icon: BarChart3,     label: 'Analytics'   },
+  { href: '/export',      icon: Download,      label: 'Export'      },
+  { href: '/search',      icon: Search,        label: 'Search'      },
+  { href: '/help',        icon: HelpCircle,    label: 'Help'        },
+  { href: '/settings',    icon: Settings,      label: 'Settings'    },
+  { href: '/profile',     icon: User,          label: 'Profile'     },
 ];
 
-const APP_PREFIXES = NAV_ITEMS.map((i) => i.href).concat(['/profile']);
-
 export default function AppSidebar() {
-  const pathname = usePathname() ?? '/';
-  const router   = useRouter();
-  const { user, refresh } = useUser();
+  const pathname = usePathname() || '/';
+  const { user, loading, refresh } = useUser();
+  const [show, setShow] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const initRef = useRef(false);
 
-  const [searchOpen,    setSearchOpen]    = useState(false);
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [onboardOpen,   setOnboardOpen]   = useState(false);
-
-  // ⌘K global shortcut — hooks MUST be called before any early return
   useEffect(() => {
-    const fn = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setSearchOpen(true); }
-      if (e.key === '?' && !['INPUT','TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
-        setShortcutsOpen(true);
-      }
-    };
-    window.addEventListener('keydown', fn);
-    return () => window.removeEventListener('keydown', fn);
-  }, []);
-
-  // Early return AFTER all hooks
-  const show = APP_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-  if (!show) return null;
-
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+    const appPaths = ['/chat', '/documents', '/collections', '/analytics', '/export', '/search', '/help', '/settings', '/profile'];
+    const isApp = appPaths.some((p) => pathname.startsWith(p));
+    setShow(isApp);
+    if (isApp) setExpanded(false);
+  }, [pathname]);
 
   const logout = async () => {
+    if (initRef.current) return;
+    initRef.current = true;
     await fetch('/api/auth/logout', { method: 'POST' });
     await refresh();
-    router.replace('/auth');
+    initRef.current = false;
+    window.location.href = '/';
   };
 
-  const initials = user?.name?.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) ?? '?';
+  if (!show) return null;
+
+  const initials = user?.name
+    ? user.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+    : user?.email?.[0]?.toUpperCase() || '?';
 
   return (
     <>
-      <SearchPanel       open={searchOpen}    onClose={() => setSearchOpen(false)}    />
-      <KeyboardShortcuts open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-      <OnboardingModal   open={onboardOpen}   onClose={() => setOnboardOpen(false)}   />
-
-      {/* ── Desktop sidebar ──────────────────────────────────────── */}
-      <aside className="hidden lg:flex fixed top-16 left-0 bottom-0 w-56 z-30 flex-col border-r border-border bg-bg-secondary/50 backdrop-blur-sm px-3 pt-4 pb-4">
-
-        {/* Home */}
-        <Link href="/" className="flex items-center gap-2 px-3 py-2 mb-1 rounded-lg text-xs text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors">
-          <Home className="w-3.5 h-3.5 shrink-0" />Back to Home
-        </Link>
-
-        {/* ⌘K Search */}
-        <button onClick={() => setSearchOpen(true)}
-          className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg text-xs bg-bg-card border border-border text-text-muted hover:border-blue-500/25 hover:text-text-secondary transition-all group">
-          <Search className="w-3.5 h-3.5 shrink-0 group-hover:text-accent transition-colors" />
-          <span className="flex-1 text-left">Search…</span>
-          <kbd className="text-[9px] font-mono bg-bg-secondary px-1.5 py-0.5 rounded border border-border">⌘K</kbd>
-        </button>
-
-        <p className="px-3 mb-1.5 text-[10px] font-mono font-bold tracking-widest text-text-muted uppercase">Workspace</p>
-
-        {/* Nav items */}
-        <nav className="flex flex-col gap-0.5 flex-1 overflow-y-auto no-scrollbar">
-          {NAV_ITEMS.map((item) => {
-            const active = isActive(item.href);
-            const Icon   = item.icon;
-            return (
-              <Link key={item.href} href={item.href}
-                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  active
-                    ? 'text-accent bg-accent/10'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
-                }`}>
-                {active && (
-                  <motion.span layoutId="sidebar-indicator"
-                    className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-accent" />
-                )}
-                <Icon className="w-4 h-4 shrink-0" />
-                {item.label}
-              </Link>
-            );
-          })}
-
-          {/* Profile */}
-          <Link href="/profile"
-            className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              pathname === '/profile'
-                ? 'text-accent bg-accent/10'
-                : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
-            }`}>
-            <User className="w-4 h-4 shrink-0" />Profile
-          </Link>
-        </nav>
-
-        {/* Keyboard shortcuts + guide */}
-        <div className="flex gap-1.5 mb-3 mt-2">
-          <button onClick={() => setShortcutsOpen(true)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-border text-[10px] text-text-muted hover:text-text-secondary hover:bg-bg-hover transition-colors">
-            <Keyboard className="w-3 h-3" />Shortcuts
-          </button>
-          <button onClick={() => setOnboardOpen(true)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-border text-[10px] text-text-muted hover:text-text-secondary hover:bg-bg-hover transition-colors">
-            <BookOpen className="w-3 h-3" />Guide
-          </button>
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex flex-col w-56 shrink-0 border-r border-border bg-bg-secondary/50 sticky top-0 h-screen">
+        {/* Brand */}
+        <div className="flex items-center gap-2.5 px-4 h-16 border-b border-border">
+          <div className="w-8 h-8 rounded-lg bg-accent-soft border border-accent/30 flex items-center justify-center">
+            <Logo className="h-4.5 w-4.5" animated />
+          </div>
+          <span className="font-bold text-sm tracking-tight">
+            Docu<span className="gradient-text">Mind</span>
+          </span>
         </div>
 
-        {/* User + logout */}
-        <div className="border-t border-border pt-3">
-          <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-bg-card/50">
-            <Link href="/profile"
-              className="w-7 h-7 rounded-lg bg-accent/20 border border-accent/30 flex items-center justify-center shrink-0 hover:bg-accent/30 transition-colors">
-              <span className="text-[10px] font-bold text-accent">{initials}</span>
-            </Link>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-text-primary truncate">{user?.name ?? '…'}</p>
-              <p className="text-[10px] text-text-muted truncate">{user?.email ?? ''}</p>
+        <div className="flex-1 overflow-y-auto py-3">
+          {/* Back to home */}
+          <Link
+            href="/"
+            className="flex items-center gap-2 px-3 py-2 mx-2 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors mb-3"
+          >
+            <Home className="h-3.5 w-3.5" />
+            Back to Home
+          </Link>
+
+          <p className="px-4 pb-1 text-[10px] font-bold tracking-widest text-text-muted">WORKSPACE</p>
+          <nav className="space-y-0.5 px-2">
+            {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
+              const active = pathname.startsWith(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    active
+                      ? 'bg-accent-soft text-accent border-l-2 border-accent ml-[-2px]'
+                      : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
+                  }`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {label}
+                  {active && <ChevronRight className="ml-auto h-3 w-3 opacity-50" />}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* User footer */}
+        <div className="border-t border-border p-3">
+          <div className="flex items-center gap-2.5 px-2 py-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center text-white text-xs font-bold shrink-0">
+              {loading ? '…' : initials}
             </div>
-            <button onClick={logout} title="Sign out"
-              className="p-1 rounded-md text-text-muted hover:text-danger hover:bg-danger/10 transition-colors">
-              <LogOut className="w-3.5 h-3.5" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium truncate">{user?.name || '—'}</p>
+              <p className="text-[10px] text-text-muted truncate">{user?.email || '—'}</p>
+            </div>
+            <button
+              onClick={logout}
+              title="Sign out"
+              className="p-1.5 rounded-lg text-text-muted hover:bg-bg-hover hover:text-text-primary transition-colors shrink-0"
+            >
+              <LogOut className="h-3.5 w-3.5" />
             </button>
           </div>
-          <p className="px-3 mt-2 text-[10px] text-text-muted font-mono">DocuMind v3.1</p>
+          <p className="text-[10px] text-text-muted text-center mt-1">DocuMind v3.2</p>
         </div>
       </aside>
 
-      {/* ── Mobile tab bar ───────────────────────────────────────── */}
-      <nav className="lg:hidden sticky top-16 z-30 flex gap-1 overflow-x-auto border-b border-border bg-bg-secondary/80 backdrop-blur-sm px-2 py-2 no-scrollbar">
-        <Link href="/"
-          className="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-xs font-medium text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors shrink-0">
-          <Home className="w-3.5 h-3.5" />
-        </Link>
-        <button onClick={() => setSearchOpen(true)}
-          className="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-xs font-medium text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors shrink-0">
-          <Search className="w-3.5 h-3.5" />
-        </button>
-        {NAV_ITEMS.map((item) => {
-          const active = isActive(item.href);
-          const Icon   = item.icon;
-          return (
-            <Link key={item.href} href={item.href}
-              className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium transition-colors shrink-0 ${
-                active
-                  ? 'text-accent bg-accent/10'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
-              }`}>
-              <Icon className="w-3.5 h-3.5 shrink-0" />
-              {item.label}
-            </Link>
-          );
-        })}
+      {/* Mobile bottom tab bar */}
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-bg-secondary/90 backdrop-blur">
+        <div className="flex">
+          {[
+            { href: '/chat',      icon: MessageSquare, label: 'Chat'    },
+            { href: '/documents', icon: FileText,      label: 'Docs'    },
+            { href: '/collections', icon: Layers,      label: 'Folders' },
+            { href: '/search',    icon: Search,        label: 'Search'  },
+            { href: '/settings',  icon: Settings,      label: 'More'    },
+          ].map(({ href, icon: Icon, label }) => {
+            const active = pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] transition-colors ${
+                  active ? 'text-accent' : 'text-text-muted hover:text-text-secondary'
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                {label}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
-
-      {/* Desktop spacer */}
-      <div className="hidden lg:block w-56 shrink-0" />
     </>
   );
 }

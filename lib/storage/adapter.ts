@@ -1,39 +1,37 @@
-/**
- * StorageAdapter interface — replaces older storage implementations.
- * Kept for backward compatibility. Use lib/store.ts for all new code.
- */
-import type { User, Collection, DocumentMeta, Chunk, Citation } from '@/lib/types';
+// Storage adapter contract.
+//
+// Both the JSON-file adapter (zero-setup) and the Postgres + pgvector adapter
+// implement this interface. All methods are scoped by userId so data is
+// isolated per account.
+
+import { Chunk, Citation, Collection, DocumentMeta, User } from '../types';
 
 export interface SearchOpts {
-  userId:        string;
+  userId: string;
   collectionId?: string;
-  topK?:         number;
+  topK?: number;
 }
 
 export interface StorageAdapter {
-  /* Users */
-  getUser(id: string): Promise<User | null>;
-  getUserByEmail(email: string): Promise<User | null>;
-  saveUser(user: User): Promise<void>;
-  updateUser(id: string, patch: Partial<User>): Promise<void>;
+  init(): Promise<void>;
 
-  /* Collections */
+  // Users
+  createUser(user: User, passwordHash: string): Promise<User>;
+  getUserByEmail(email: string): Promise<(User & { passwordHash: string }) | null>;
+  getUserById(id: string): Promise<User | null>;
+  updateUser(userId: string, updates: { name?: string }): Promise<User | null>;
+
+  // Collections
   getCollections(userId: string): Promise<Collection[]>;
-  getCollection(id: string): Promise<Collection | null>;
-  saveCollection(col: Collection): Promise<void>;
-  updateCollection(id: string, patch: Partial<Collection>): Promise<void>;
-  deleteCollection(id: string): Promise<void>;
+  createCollection(c: Collection): Promise<Collection>;
+  deleteCollection(userId: string, id: string): Promise<void>;
 
-  /* Documents */
+  // Documents
   getDocuments(userId: string, collectionId?: string): Promise<DocumentMeta[]>;
-  getDocument(id: string): Promise<DocumentMeta | null>;
   saveDocument(doc: DocumentMeta): Promise<void>;
-  deleteDocument(id: string): Promise<void>;
+  deleteDocument(userId: string, id: string): Promise<void>;
 
-  /* Chunks */
+  // Chunks + retrieval
   addChunks(chunks: Chunk[]): Promise<void>;
-  deleteChunks(documentId: string): Promise<void>;
-
-  /* Vector search */
   search(queryEmbedding: number[], opts: SearchOpts): Promise<Citation[]>;
 }
