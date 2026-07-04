@@ -15,8 +15,15 @@ const HOME_SECTIONS = [
   { id: 'faq',      label: 'FAQ' },
 ];
 
+// Pages that render their own sidebar branding — Navigation hides on these
+const APP_PATHS = [
+  '/chat', '/documents', '/collections', '/analytics',
+  '/export', '/search', '/help', '/settings', '/profile',
+];
+
 export default function Navigation() {
   const pathname = usePathname() || '/';
+  const isApp = APP_PATHS.some((p) => pathname.startsWith(p));
   const isHome = pathname === '/';
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive] = useState('how');
@@ -53,6 +60,9 @@ export default function Navigation() {
     sections.forEach((s) => observer.observe(s));
     return () => observer.disconnect();
   }, [isHome]);
+
+  // Hide on app pages — the AppSidebar provides the branding there
+  if (isApp) return null;
 
   return (
     <>

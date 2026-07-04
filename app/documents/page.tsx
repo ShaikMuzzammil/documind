@@ -3,15 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  AlertCircle,
-  CheckCircle2,
-  FileText,
-  FolderPlus,
-  Loader2,
-  RefreshCw,
-  Search,
-  Trash2,
-  UploadCloud,
+  AlertCircle, CheckCircle2, FileText, FolderPlus, Loader2,
+  RefreshCw, Search, Trash2, UploadCloud, X, ChevronDown,
+  File, FileCode, Database, Hash,
 } from 'lucide-react';
 import CollectionPicker from '@/components/app/CollectionPicker';
 import AuthGate from '@/components/app/AuthGate';
@@ -27,8 +21,17 @@ function statusClass(status: DocumentMeta['status']) {
   return 'text-danger bg-danger/10 border-danger/20';
 }
 
+function FileTypeIcon({ type }: { type: string }) {
+  const t = type.toLowerCase();
+  if (t === 'pdf') return <div className="text-red-400 font-bold text-[10px] bg-red-400/10 rounded px-1 py-0.5">PDF</div>;
+  if (['md', 'txt'].includes(t)) return <File className="h-3.5 w-3.5 text-blue-400" />;
+  if (['csv', 'json'].includes(t)) return <Database className="h-3.5 w-3.5 text-green-400" />;
+  if (['js', 'ts', 'py', 'rs'].includes(t)) return <FileCode className="h-3.5 w-3.5 text-purple-400" />;
+  return <Hash className="h-3.5 w-3.5 text-text-muted" />;
+}
+
 function collectionName(collections: Collection[], id: string) {
-  return collections.find((c) => c.id === id)?.name || 'Unknown collection';
+  return collections.find((c) => c.id === id)?.name || 'Unknown';
 }
 
 export default function DocumentsPage() {
@@ -42,7 +45,9 @@ export default function DocumentsPage() {
   const [dragging, setDragging] = useState(false);
   const [loadingDocs, setLoadingDocs] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [notice, setNotice] = useState<Notice>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -86,9 +91,10 @@ export default function DocumentsPage() {
 
   const stats = useMemo(() => {
     const ready = documents.filter((doc) => doc.status === 'ready').length;
+    const processing = documents.filter((doc) => doc.status === 'processing').length;
     const chunks = documents.reduce((sum, doc) => sum + doc.chunkCount, 0);
     const bytes = documents.reduce((sum, doc) => sum + doc.size, 0);
-    return { ready, chunks, bytes };
+    return { ready, processing, chunks, bytes };
   }, [documents]);
 
   const createQuickCollection = async () => {
@@ -102,41 +108,50 @@ export default function DocumentsPage() {
   const upload = async () => {
     if (!file || !uploadCollectionId || uploading) return;
     setUploading(true);
+    setUploadProgress(0);
     setNotice(null);
     const form = new FormData();
     form.append('file', file);
     form.append('collectionId', uploadCollectionId);
 
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress(p => Math.min(p + 8, 85));
+    }, 200);
+
     try {
       const res = await fetch('/api/ingest', { method: 'POST', body: form });
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
       let data: { document?: DocumentMeta; error?: string } = {};
-      try {
-        data = await res.json();
-      } catch {
+      try { data = await res.json(); } catch {
         throw new Error(
           res.status === 413
-            ? 'That file is too large for this server. Try a smaller file.'
-            : `Upload failed unexpectedly (server returned ${res.status}). Please try again.`,
+            ? 'File is too large. Try a smaller file.'
+            : `Upload failed (server returned ${res.status}).`,
         );
       }
       if (!res.ok) throw new Error(data.error || 'Upload failed');
       setNotice({
         type: data.document?.status === 'ready' ? 'success' : 'error',
-        text:
-          data.document?.status === 'ready'
-            ? `${data.document.name} indexed with ${data.document.chunkCount} chunks.`
-            : data.document?.error || 'No extractable text was found.',
+        text: data.document?.status === 'ready'
+          ? `✓ "${data.document.name}" indexed with ${data.document.chunkCount} chunks.`
+          : data.document?.error || 'No extractable text was found.',
       });
       setFile(null);
       await refreshDocuments();
     } catch (err) {
+      clearInterval(progressInterval);
       setNotice({ type: 'error', text: err instanceof Error ? err.message : 'Upload failed.' });
     } finally {
       setUploading(false);
+      setTimeout(() => setUploadProgress(0), 1000);
     }
   };
 
   const removeDocument = async (id: string) => {
+    setDeleting(id);
     const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
     if (res.ok) {
       setNotice({ type: 'success', text: 'Document removed.' });
@@ -144,214 +159,258 @@ export default function DocumentsPage() {
     } else {
       setNotice({ type: 'error', text: 'Document could not be removed.' });
     }
+    setDeleting(null);
   };
 
   return (
     <AuthGate>
-      <div className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-xs font-mono font-bold tracking-widest text-text-muted">DOCUMENT VAULT</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight">Upload, index, and manage knowledge</h1>
-            <p className="mt-2 max-w-2xl text-sm text-text-secondary">
-              Add PDFs, notes, datasets, markdown, and code files. DocuMind chunks and embeds them for cited chat.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <CollectionPicker collections={collections} value={collectionId} onChange={setCollectionId} includeAll />
-            <button
-              onClick={refreshDocuments}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-bg-card px-3 text-sm text-text-secondary transition-colors hover:text-text-primary"
-            >
-              <RefreshCw className={`h-4 w-4 ${loadingDocs ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-          </div>
-        </header>
+      <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8 pb-24 lg:pb-8">
+        <div className="mx-auto max-w-7xl space-y-6">
+          <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-xs font-mono font-bold tracking-widest text-text-muted">DOCUMENT VAULT</p>
+              <h1 className="mt-2 text-3xl font-bold tracking-tight">Upload & Manage Documents</h1>
+              <p className="mt-2 max-w-2xl text-sm text-text-secondary">
+                Add PDFs, notes, datasets, markdown, and code files. DocuMind chunks and embeds them for cited answers.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <CollectionPicker collections={collections} value={collectionId} onChange={setCollectionId} includeAll />
+              <button
+                onClick={refreshDocuments}
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-bg-card px-3 text-sm text-text-secondary transition-colors hover:text-text-primary"
+              >
+                <RefreshCw className={`h-4 w-4 ${loadingDocs ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
+          </header>
 
-        <section className="grid gap-3 sm:grid-cols-3">
-          <div className="glass rounded-xl p-4">
-            <p className="text-xs text-text-muted">Ready documents</p>
-            <p className="mt-2 text-2xl font-semibold">{stats.ready}</p>
-          </div>
-          <div className="glass rounded-xl p-4">
-            <p className="text-xs text-text-muted">Indexed chunks</p>
-            <p className="mt-2 text-2xl font-semibold">{stats.chunks}</p>
-          </div>
-          <div className="glass rounded-xl p-4">
-            <p className="text-xs text-text-muted">Stored text files</p>
-            <p className="mt-2 text-2xl font-semibold">{formatBytes(stats.bytes)}</p>
-          </div>
-        </section>
+          {/* Stats */}
+          <section className="grid gap-3 sm:grid-cols-4">
+            {[
+              { label: 'Ready', value: stats.ready, color: 'text-success' },
+              { label: 'Processing', value: stats.processing, color: 'text-accent-2' },
+              { label: 'Total Chunks', value: stats.chunks, color: 'text-accent' },
+              { label: 'Stored', value: formatBytes(stats.bytes), color: 'text-text-primary' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="glass rounded-xl p-4">
+                <p className="text-xs text-text-muted">{label}</p>
+                <p className={`mt-1.5 text-2xl font-bold ${color}`}>{value}</p>
+              </div>
+            ))}
+          </section>
 
-        {notice && (
-          <div
-            className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${
+          {notice && (
+            <div className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${
               notice.type === 'success'
                 ? 'border-success/25 bg-success/10 text-success'
                 : 'border-danger/25 bg-danger/10 text-danger'
-            }`}
-          >
-            {notice.type === 'success' ? <CheckCircle2 className="mt-0.5 h-4 w-4" /> : <AlertCircle className="mt-0.5 h-4 w-4" />}
-            <span>{notice.text}</span>
-          </div>
-        )}
+            }`}>
+              {notice.type === 'success' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />}
+              <span className="flex-1">{notice.text}</span>
+              <button onClick={() => setNotice(null)}><X className="h-4 w-4 opacity-60 hover:opacity-100" /></button>
+            </div>
+          )}
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(320px,420px)_1fr]">
-          <div className="space-y-4">
-            <div className="glass rounded-xl p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <UploadCloud className="h-5 w-5 text-accent" />
-                <h2 className="font-semibold">Ingest a document</h2>
+          <section className="grid gap-6 xl:grid-cols-[minmax(300px,380px)_1fr]">
+            {/* Upload panel */}
+            <div className="space-y-4">
+              <div className="glass rounded-xl p-5">
+                <div className="mb-4 flex items-center gap-2">
+                  <UploadCloud className="h-5 w-5 text-accent" />
+                  <h2 className="font-semibold">Ingest a document</h2>
+                </div>
+
+                {collections.length === 0 && !loadingCollections ? (
+                  <div className="rounded-lg border border-border bg-bg-secondary/50 p-4">
+                    <p className="text-sm text-text-secondary mb-3">Create a collection before uploading.</p>
+                    <div className="flex gap-2">
+                      <input
+                        value={newCollectionName}
+                        onChange={(e) => setNewCollectionName(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && createQuickCollection()}
+                        placeholder="Research, Legal, Product..."
+                        className="min-w-0 flex-1 rounded-lg border border-border bg-bg-card px-3 py-2 text-sm outline-none focus:border-accent/50"
+                      />
+                      <button
+                        onClick={createQuickCollection}
+                        disabled={!newCollectionName.trim()}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                      >
+                        <FolderPlus className="h-4 w-4" /> Create
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <label className="mb-2 block text-xs font-medium text-text-muted">Target Collection</label>
+                    <CollectionPicker collections={collections} value={uploadCollectionId} onChange={setUploadCollectionId} />
+
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                      onDragLeave={() => setDragging(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragging(false);
+                        const dropped = e.dataTransfer.files?.[0];
+                        if (dropped) setFile(dropped);
+                      }}
+                      className={`mt-4 rounded-xl border border-dashed p-6 text-center transition-all cursor-pointer ${
+                        dragging ? 'border-accent bg-accent/8 scale-[1.01]' : 'border-border bg-bg-secondary/50 hover:border-border/60'
+                      }`}
+                      onClick={() => document.getElementById('file-input')?.click()}
+                    >
+                      <UploadCloud className={`mx-auto h-8 w-8 mb-2 transition-colors ${dragging ? 'text-accent' : 'text-text-muted'}`} />
+                      {file ? (
+                        <div>
+                          <p className="text-sm font-medium text-text-primary">{file.name}</p>
+                          <p className="text-xs text-text-muted mt-1">{formatBytes(file.size)} — ready to upload</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm font-medium">Drop a file or click to choose</p>
+                          <p className="mt-1 text-xs text-text-muted">PDF, TXT, MD, CSV, JSON, and code files</p>
+                        </div>
+                      )}
+                    </div>
+                    <input id="file-input" type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+
+                    {/* Progress bar */}
+                    {uploading && (
+                      <div className="mt-3">
+                        <div className="flex justify-between text-xs text-text-muted mb-1">
+                          <span>Indexing…</span><span>{uploadProgress}%</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-bg-hover rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-accent rounded-full transition-all duration-300"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={upload}
+                      disabled={!file || !uploadCollectionId || uploading}
+                      className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {uploading ? (
+                        <><Loader2 className="h-4 w-4 animate-spin" /> Indexing…</>
+                      ) : (
+                        <><UploadCloud className="h-4 w-4" /> Upload and index</>
+                      )}
+                    </button>
+                  </>
+                )}
               </div>
 
-              {collections.length === 0 && !loadingCollections ? (
-                <div className="rounded-lg border border-border bg-bg-secondary/50 p-4">
-                  <p className="text-sm text-text-secondary">Create a collection before uploading your first document.</p>
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      value={newCollectionName}
-                      onChange={(e) => setNewCollectionName(e.target.value)}
-                      placeholder="Research, Legal, Product..."
-                      className="min-w-0 flex-1 rounded-lg border border-border bg-bg-card px-3 py-2 text-sm outline-none focus:border-accent/50"
-                    />
-                    <button
-                      onClick={createQuickCollection}
-                      disabled={!newCollectionName.trim()}
-                      className="inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
-                    >
-                      <FolderPlus className="h-4 w-4" />
-                      Create
-                    </button>
-                  </div>
+              {/* Supported formats */}
+              <div className="glass rounded-xl p-4">
+                <p className="text-xs font-semibold text-text-muted mb-3">SUPPORTED FORMATS</p>
+                <div className="grid grid-cols-2 gap-1.5 text-xs text-text-secondary">
+                  {['PDF', 'TXT', 'Markdown', 'CSV', 'JSON', 'JavaScript', 'TypeScript', 'Python'].map(f => (
+                    <div key={f} className="flex items-center gap-1.5">
+                      <div className="h-1 w-1 rounded-full bg-success" />{f}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Documents table */}
+            <div className="glass overflow-hidden rounded-xl">
+              <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="font-semibold">Indexed documents</h2>
+                  <p className="text-xs text-text-muted">Auto-refreshes every 8 seconds</p>
+                </div>
+                <div className="relative w-full sm:w-64">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Filter filenames…"
+                    className="w-full rounded-lg border border-border bg-bg-card py-2 pl-9 pr-3 text-sm outline-none focus:border-accent/50"
+                  />
+                </div>
+              </div>
+
+              {loadingDocs ? (
+                <div className="flex items-center justify-center gap-2 p-10 text-sm text-text-muted">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading documents…
+                </div>
+              ) : filteredDocuments.length === 0 ? (
+                <div className="p-10 text-center">
+                  <FileText className="mx-auto h-10 w-10 text-text-muted opacity-40" />
+                  <h3 className="mt-3 font-semibold">No documents found</h3>
+                  <p className="mx-auto mt-2 max-w-sm text-sm text-text-muted">
+                    {query ? `No files match "${query}".` : 'Upload your first file to get started.'}
+                  </p>
                 </div>
               ) : (
-                <>
-                  <label className="mb-2 block text-xs font-medium text-text-muted">Collection</label>
-                  <CollectionPicker collections={collections} value={uploadCollectionId} onChange={setUploadCollectionId} />
-
-                  <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragging(true);
-                    }}
-                    onDragLeave={() => setDragging(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setDragging(false);
-                      setFile(e.dataTransfer.files?.[0] || null);
-                    }}
-                    className={`mt-4 rounded-xl border border-dashed p-6 text-center transition-colors ${
-                      dragging ? 'border-accent bg-accent-soft' : 'border-border bg-bg-secondary/50'
-                    }`}
-                  >
-                    <UploadCloud className="mx-auto h-9 w-9 text-accent" />
-                    <p className="mt-3 text-sm font-medium">Drop a file here or choose one</p>
-                    <p className="mt-1 text-xs text-text-muted">PDF, TXT, MD, CSV, JSON, and code-like text files.</p>
-                    <input
-                      type="file"
-                      onChange={(e) => setFile(e.target.files?.[0] || null)}
-                      className="mt-4 w-full rounded-lg border border-border bg-bg-card px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
-                    />
-                    {file && <p className="mt-3 text-xs text-text-secondary">{file.name} - {formatBytes(file.size)}</p>}
-                  </div>
-
-                  <button
-                    onClick={upload}
-                    disabled={!file || !uploadCollectionId || uploading}
-                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
-                    {uploading ? 'Indexing document...' : 'Upload and index'}
-                  </button>
-                </>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-left text-sm">
+                    <thead className="bg-bg-secondary/60 text-xs uppercase tracking-wide text-text-muted">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">Document</th>
+                        <th className="px-4 py-3 font-medium">Collection</th>
+                        <th className="px-4 py-3 font-medium">Chunks</th>
+                        <th className="px-4 py-3 font-medium">Size</th>
+                        <th className="px-4 py-3 font-medium">Status</th>
+                        <th className="px-4 py-3 font-medium">Added</th>
+                        <th className="px-4 py-3 font-medium"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredDocuments.map((doc) => (
+                        <tr key={doc.id} className="border-t border-border/70 hover:bg-bg-secondary/30 transition-colors">
+                          <td className="max-w-[240px] px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <FileTypeIcon type={doc.type} />
+                              <div>
+                                <div className="truncate font-medium">{doc.name}</div>
+                                {doc.error && <div className="mt-0.5 truncate text-xs text-danger">{doc.error}</div>}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-text-secondary text-xs">{collectionName(collections, doc.collectionId)}</td>
+                          <td className="px-4 py-3 text-text-secondary font-mono text-xs">{doc.chunkCount}</td>
+                          <td className="px-4 py-3 text-text-secondary text-xs">{formatBytes(doc.size)}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusClass(doc.status)}`}>
+                              {doc.status === 'processing' && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
+                              {doc.status === 'ready' && <div className="h-1.5 w-1.5 rounded-full bg-success" />}
+                              {doc.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-text-muted text-xs">{relativeTime(doc.createdAt)}</td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => removeDocument(doc.id)}
+                              disabled={deleting === doc.id}
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-40"
+                              aria-label={`Delete ${doc.name}`}
+                            >
+                              {deleting === doc.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
+          </section>
+
+          <div className="rounded-xl border border-border bg-bg-secondary/35 px-4 py-3 text-sm text-text-secondary">
+            Ready to ask questions?{' '}
+            <Link href="/chat" className="text-accent hover:underline">Open Chat</Link>
+            {' '}and scope answers to any collection.
           </div>
-
-          <div className="glass overflow-hidden rounded-xl">
-            <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="font-semibold">Indexed documents</h2>
-                <p className="text-xs text-text-muted">Live refreshes every few seconds while this page is open.</p>
-              </div>
-              <div className="relative w-full sm:w-72">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search filenames"
-                  className="w-full rounded-lg border border-border bg-bg-card py-2 pl-9 pr-3 text-sm outline-none focus:border-accent/50"
-                />
-              </div>
-            </div>
-
-            {loadingDocs ? (
-              <div className="flex items-center justify-center gap-2 p-10 text-sm text-text-muted">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading documents
-              </div>
-            ) : filteredDocuments.length === 0 ? (
-              <div className="p-10 text-center">
-                <FileText className="mx-auto h-10 w-10 text-text-muted" />
-                <h3 className="mt-3 font-semibold">No documents found</h3>
-                <p className="mx-auto mt-2 max-w-sm text-sm text-text-muted">
-                  Upload your first file or adjust the active collection and filename filters.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm">
-                  <thead className="bg-bg-secondary/60 text-xs uppercase tracking-wide text-text-muted">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">Document</th>
-                      <th className="px-4 py-3 font-medium">Collection</th>
-                      <th className="px-4 py-3 font-medium">Chunks</th>
-                      <th className="px-4 py-3 font-medium">Size</th>
-                      <th className="px-4 py-3 font-medium">Status</th>
-                      <th className="px-4 py-3 font-medium">Added</th>
-                      <th className="px-4 py-3 font-medium"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredDocuments.map((doc) => (
-                      <tr key={doc.id} className="border-t border-border/70">
-                        <td className="max-w-[260px] px-4 py-3">
-                          <div className="truncate font-medium">{doc.name}</div>
-                          {doc.error && <div className="mt-1 truncate text-xs text-danger">{doc.error}</div>}
-                        </td>
-                        <td className="px-4 py-3 text-text-secondary">{collectionName(collections, doc.collectionId)}</td>
-                        <td className="px-4 py-3 text-text-secondary">{doc.chunkCount}</td>
-                        <td className="px-4 py-3 text-text-secondary">{formatBytes(doc.size)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex rounded-full border px-2 py-1 text-xs ${statusClass(doc.status)}`}>
-                            {doc.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-text-muted">{relativeTime(doc.createdAt)}</td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => removeDocument(doc.id)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-danger/10 hover:text-danger"
-                            aria-label={`Delete ${doc.name}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </section>
-
-        <div className="rounded-xl border border-border bg-bg-secondary/35 px-4 py-3 text-sm text-text-secondary">
-          Ready to ask questions? Open <Link href="/chat" className="text-accent hover:underline">Chat</Link> and scope answers to any collection.
         </div>
-      </div>
       </div>
     </AuthGate>
   );

@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
-  AlertCircle, Calendar, CheckCircle2, Edit2, FolderOpen, Layers, Save, TrendingUp, User, X,
+  AlertCircle, Calendar, CheckCircle2, Edit2, FolderOpen,
+  Layers, Save, User, X, FileText, Activity, Award,
 } from 'lucide-react';
 import AuthGate from '@/components/app/AuthGate';
 import { WorkspaceStats } from '@/lib/analytics';
 import { useUser } from '@/lib/use-user';
+import { formatBytes } from '@/lib/utils';
 
 function fmt(bytes: number) {
   if (bytes < 1024) return bytes + ' B';
@@ -38,7 +40,7 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { if (user) setName(user.name || ''); }, [user]);
+  useEffect(() => { if (user) setName((user as { name?: string }).name || ''); }, [user]);
   useEffect(() => { if (editName) inputRef.current?.focus(); }, [editName]);
 
   const saveName = async () => {
@@ -62,13 +64,25 @@ export default function ProfilePage() {
     }
   };
 
-  const initials = user?.name
-    ? user.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
-    : user?.email?.[0]?.toUpperCase() || '?';
+  const typedUser = user as { name?: string; email?: string; createdAt?: string } | null;
+  const initials = typedUser?.name
+    ? typedUser.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+    : typedUser?.email?.[0]?.toUpperCase() || '?';
+
+  const totalChunks = stats?.totals.chunks || 0;
+  const totalDocs = stats?.totals.documents || 0;
+  const totalBytes = stats?.totals.bytes || 0;
+
+  const achievements = [
+    { label: 'First document', earned: totalDocs >= 1, Icon: FileText },
+    { label: '10+ chunks indexed', earned: totalChunks >= 10, Icon: Layers },
+    { label: '5+ documents', earned: totalDocs >= 5, Icon: Award },
+    { label: 'Built a collection', earned: (stats?.totals.collections || 0) >= 1, Icon: FolderOpen },
+  ];
 
   return (
     <AuthGate>
-      <div className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-6 lg:px-8 pb-24 lg:pb-8">
+      <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8 pb-24 lg:pb-8">
         <div className="mx-auto max-w-5xl space-y-6">
           <p className="text-xs font-mono font-bold tracking-widest text-text-muted">ACCOUNT</p>
           <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
@@ -81,102 +95,127 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* Profile card */}
-          <section className="glass rounded-xl p-6">
-            <div className="flex flex-col sm:flex-row gap-5 items-start">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center text-white text-2xl font-bold shrink-0">
-                {initials}
-              </div>
-              <div className="flex-1 min-w-0">
+          <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+            {/* Profile card */}
+            <div className="space-y-4">
+              <div className="glass rounded-xl p-6 text-center">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4 shadow-lg shadow-accent/20">
+                  {initials}
+                </div>
+
                 {editName ? (
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="space-y-2">
                     <input
                       ref={inputRef}
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') { setEditName(false); setName(user?.name || ''); }}}
-                      className="flex-1 rounded-lg border border-accent/50 bg-bg-card px-3 py-1.5 text-lg font-bold outline-none"
+                      onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditName(false); }}
+                      className="w-full rounded-lg border border-border bg-bg-card px-3 py-2 text-sm text-center outline-none focus:border-accent/50"
                     />
-                    <button onClick={saveName} disabled={saving} className="p-2 rounded-lg bg-accent/20 text-accent hover:bg-accent/30">
-                      <Save className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => { setEditName(false); setName(user?.name || ''); }} className="p-2 rounded-lg text-text-muted hover:text-text-primary">
-                      <X className="h-4 w-4" />
-                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={saveName} disabled={saving}
+                        className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg bg-accent py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                      >
+                        {saving ? '…' : <><Save className="h-3 w-3" /> Save</>}
+                      </button>
+                      <button onClick={() => setEditName(false)}
+                        className="flex-1 rounded-lg border border-border py-1.5 text-xs text-text-muted hover:text-text-primary"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 mb-1">
-                    <h2 className="text-xl font-bold">{user?.name || 'Unnamed user'}</h2>
-                    <button onClick={() => setEditName(true)} className="p-1 rounded text-text-muted hover:text-text-primary transition-colors">
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </button>
+                  <div>
+                    <div className="flex items-center justify-center gap-2">
+                      <p className="font-bold text-lg">{typedUser?.name || 'Anonymous'}</p>
+                      <button onClick={() => setEditName(true)}
+                        className="p-1 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <p className="text-sm text-text-muted mt-0.5">{typedUser?.email}</p>
+                    {typedUser?.createdAt && (
+                      <p className="text-xs text-text-muted mt-2 flex items-center justify-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Since {new Date(typedUser.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      </p>
+                    )}
                   </div>
                 )}
-                <p className="text-sm text-text-secondary">{user?.email}</p>
-                <p className="mt-1 flex items-center gap-1.5 text-xs text-text-muted">
-                  <Calendar className="h-3.5 w-3.5" />
-                  Member since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '—'}
-                </p>
+              </div>
+
+              {/* Achievements */}
+              <div className="glass rounded-xl p-4">
+                <p className="text-xs font-bold tracking-widest text-text-muted mb-3">ACHIEVEMENTS</p>
+                <div className="space-y-2">
+                  {achievements.map(({ label, earned, Icon }) => (
+                    <div key={label} className={`flex items-center gap-2.5 rounded-lg px-3 py-2 ${earned ? 'bg-success/8 border border-success/15' : 'opacity-40'}`}>
+                      <Icon className={`h-4 w-4 ${earned ? 'text-success' : 'text-text-muted'}`} />
+                      <span className="text-xs">{label}</span>
+                      {earned && <CheckCircle2 className="ml-auto h-3.5 w-3.5 text-success" />}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </section>
 
-          {/* Stats cards */}
-          {stats && (
-            <section className="grid gap-4 sm:grid-cols-4">
-              {[
-                { icon: User, label: 'Documents', value: stats.totals.documents },
-                { icon: FolderOpen, label: 'Collections', value: stats.totals.collections },
-                { icon: Layers, label: 'Chunks', value: stats.totals.chunks },
-                { icon: TrendingUp, label: 'Storage', value: fmt(stats.totals.bytes) },
-              ].map(({ icon: Icon, label, value }) => (
-                <div key={label} className="glass rounded-xl p-4">
-                  <p className="text-xs text-text-muted">{label}</p>
-                  <p className="mt-2 text-2xl font-bold">{value}</p>
-                </div>
-              ))}
-            </section>
-          )}
-
-          {/* Charts row */}
-          {stats && (
-            <section className="grid gap-6 lg:grid-cols-2">
-              <div className="glass rounded-xl p-5">
-                <h3 className="font-semibold mb-4">Monthly uploads</h3>
-                {stats.monthly.length === 0 ? (
-                  <p className="text-sm text-text-muted py-6 text-center">No upload activity yet</p>
-                ) : (
-                  <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={stats.monthly} margin={{ left: -20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#6b7280' }} />
-                      <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} allowDecimals={false} />
-                      <Tooltip contentStyle={{ background: '#161922', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }} labelStyle={{ color: '#e6e9ef' }} />
-                      <Bar dataKey="count" name="Uploads" fill="#6366f1" radius={[4,4,0,0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
+            {/* Stats */}
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[
+                  { Icon: FileText,   label: 'Documents',  value: totalDocs,             color: 'text-accent' },
+                  { Icon: Layers,     label: 'Chunks',     value: totalChunks,            color: 'text-cyan-400' },
+                  { Icon: Activity,   label: 'Storage',    value: fmt(totalBytes),        color: 'text-emerald-400' },
+                ].map(({ Icon, label, value, color }) => (
+                  <div key={label} className="glass rounded-xl p-4 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-bg-card border border-border/60 flex items-center justify-center">
+                      <Icon className={`h-4 w-4 ${color}`} />
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold">{loading ? '–' : value}</p>
+                      <p className="text-xs text-text-muted">{label}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              <div className="glass rounded-xl p-5">
-                <h3 className="font-semibold mb-4">Top collections</h3>
-                {stats.collections.length === 0 ? (
-                  <p className="text-sm text-text-muted py-6 text-center">No collections yet</p>
-                ) : (
-                  <div className="space-y-3">
-                    {stats.collections.slice(0, 5).map((col, i) => (
-                      <div key={col.id} className="flex items-center gap-3">
-                        <span className="text-xs text-text-muted w-4 shrink-0">#{i + 1}</span>
-                        <FolderOpen className="h-4 w-4 text-accent shrink-0" />
-                        <span className="flex-1 text-sm truncate">{col.name}</span>
-                        <span className="text-xs text-text-muted shrink-0">{col.documents} docs · {fmt(col.bytes)}</span>
+              {/* Collections breakdown chart */}
+              {stats && stats.collections.length > 0 && (
+                <div className="glass rounded-xl p-5">
+                  <h2 className="font-semibold mb-4 text-sm">Collections overview</h2>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={stats.collections} margin={{ left: -20 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} />
+                      <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} allowDecimals={false} />
+                      <Tooltip contentStyle={{ background: '#161922', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }} />
+                      <Bar dataKey="documents" name="Documents" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Recent docs */}
+              {stats && stats.recentDocuments.length > 0 && (
+                <div className="glass rounded-xl overflow-hidden">
+                  <div className="border-b border-border px-4 py-3">
+                    <h2 className="font-semibold text-sm">Recently indexed</h2>
+                  </div>
+                  <div className="divide-y divide-border/60">
+                    {stats.recentDocuments.slice(0, 5).map(doc => (
+                      <div key={doc.id} className="flex items-center gap-3 px-4 py-3">
+                        <FileText className="h-4 w-4 text-text-muted shrink-0" />
+                        <span className="flex-1 text-sm truncate">{doc.name}</span>
+                        <span className={`text-xs rounded-full px-2 py-0.5 ${doc.status === 'ready' ? 'bg-success/10 text-success' : 'bg-yellow-500/10 text-yellow-400'}`}>{doc.status}</span>
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
-            </section>
-          )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </AuthGate>
