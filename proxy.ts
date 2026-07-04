@@ -83,7 +83,7 @@ async function verifyToken(token: string): Promise<boolean> {
 }
 
 /* ── Main handler ───────────────────────────────────────────────────── */
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (!isProtected(pathname)) return NextResponse.next();
 
