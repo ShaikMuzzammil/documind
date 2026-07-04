@@ -2,254 +2,334 @@
 
 # DocuMind
 
-**Intelligent Document Workspace — RAG-powered Q&A over your own files**
+**RAG-powered document intelligence — self-hosted & private**
+
+Upload PDFs, notes, and code · Ask questions in plain language · Get cited answers from your own files
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://typescriptlang.org)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss)](https://tailwindcss.com)
-[![Vercel](https://img.shields.io/badge/Deploy-Vercel-000?logo=vercel)](https://vercel.com)
-
-[Live Demo](https://documind-chl35p8w4-shaik-muzzammils-projects.vercel.app) · [GitHub](https://github.com/ShaikMuzzammil/documind)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript)](https://typescriptlang.org)
+[![Deployed on Vercel](https://img.shields.io/badge/Deploy-Vercel-black?logo=vercel)](https://vercel.com)
 
 </div>
 
 ---
 
-## What is DocuMind?
+## Table of Contents
 
-DocuMind is a **production-grade Retrieval-Augmented Generation (RAG) platform** built with Next.js 16. Upload documents, organise them into collections, and ask plain-language questions — every answer is grounded in your own files with source citations, not hallucinated.
-
-```
-you  > What are the key obligations in the Q3 contract?
-dm   > Based on Section 4.2 of agreement-q3.pdf, the obligations are:
-       (1) payment within 30 days of invoice,
-       (2) quarterly performance reviews,
-       (3) data confidentiality provisions.
-cite > [Sources: agreement-q3.pdf p.8, nda-2024.pdf p.3] · 3 citations · 91% confidence
-```
-
----
-
-## Feature Set
-
-| Area | What's included |
-|---|---|
-| **Upload** | PDF, Markdown, TXT, CSV, JSON, code files up to 15 MB |
-| **Search** | Semantic vector search (cosine similarity / pgvector) |
-| **Chat** | Streaming answers via Server-Sent Events |
-| **Citations** | Per-message source links with page references |
-| **Collections** | Organise documents into isolated project workspaces |
-| **Analytics** | Upload trends, file type breakdown, chunk statistics |
-| **Export** | Full workspace JSON export (documents + collections) |
-| **Auth** | HMAC-signed session cookies, per-user data isolation |
-| **Settings** | Profile editing, capability status, notification prefs |
-| **Search** | Full-text semantic search across all documents |
+1. [What it does](#what-it-does)
+2. [Tech stack](#tech-stack)
+3. [Quick start (local)](#quick-start-local)
+4. [Configuration — environment variables](#configuration--environment-variables)
+   - [Required variables](#required-variables)
+   - [AI / LLM provider](#ai--llm-provider)
+   - [Supported providers](#supported-providers)
+   - [Database (optional, recommended for production)](#database-optional-recommended-for-production)
+   - [Email (optional)](#email-optional)
+5. [Deploy to Vercel](#deploy-to-vercel)
+6. [How RAG works in DocuMind](#how-rag-works-in-documind)
+7. [File types supported](#file-types-supported)
+8. [Project structure](#project-structure)
+9. [FAQ](#faq)
 
 ---
 
-## Architecture
+## What it does
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Next.js 16 (App Router + Turbopack)                    │
-│                                                         │
-│  ┌───────────┐   ┌───────────┐   ┌──────────────────┐  │
-│  │  /app     │   │  /api     │   │  proxy.ts         │  │
-│  │  pages    │◄──│  routes   │   │  (Edge Runtime)   │  │
-│  └───────────┘   └─────┬─────┘   └──────────────────┘  │
-│                        │                                │
-│  ┌─────────────────────▼───────────────────────────┐   │
-│  │  lib/                                           │   │
-│  │  ├── auth.ts       HMAC session tokens          │   │
-│  │  ├── embeddings.ts Gemini text-embedding-004    │   │
-│  │  ├── llm.ts        Gemini gemini-2.0-flash      │   │
-│  │  ├── chunk.ts      Text splitter (512t / 64o)   │   │
-│  │  └── storage/                                   │   │
-│  │      ├── json-adapter.ts   (development)        │   │
-│  │      └── postgres-adapter.ts (production)       │   │
-│  └─────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-```
+DocuMind is a self-hosted workspace that lets you:
 
-**Storage strategy:** The app auto-detects whether `DATABASE_URL` is set.
-- **Local JSON** (no env var): data lives in `/data/*.json`, great for local dev
-- **Postgres + pgvector** (env var set): production-grade, Vercel / Neon / Supabase ready
+- **Upload** documents (PDF, Markdown, CSV, JSON, code files)
+- **Index** them automatically — text is extracted, split into ~512-token chunks, and embedded as vectors
+- **Chat** with your documents — ask anything in plain language and receive AI answers grounded in your files, with citations pointing to the exact source passages
+- **Search** semantically — find relevant passages across all documents by meaning, not just keywords
+- **Organize** with Collections — group related documents and scope chat retrieval to a single collection
+- **Export** your data — download documents and collections as CSV, JSON, or Markdown
+
+All data stays in **your** database. AI answers are generated using **your** API key. Nothing is shared with DocuMind servers.
 
 ---
 
-## Quick Start
-
-### 1. Clone and install
-
-```bash
-git clone https://github.com/ShaikMuzzammil/documind.git
-cd documind
-npm install
-```
-
-### 2. Configure environment
-
-```bash
-cp .env.example .env.local
-```
-
-Edit `.env.local`:
-
-```env
-# Required for AI answers
-GEMINI_API_KEY=your_gemini_key_here
-
-# Required in production (generates session tokens)
-AUTH_SECRET=at-least-32-random-characters
-
-# Optional — Postgres + pgvector (uses local JSON files without this)
-DATABASE_URL=postgresql://user:password@host:5432/documind
-
-# Optional — welcome emails
-RESEND_API_KEY=your_resend_key
-EMAIL_FROM=DocuMind <hello@yourdomain.com>
-```
-
-### 3. Run
-
-```bash
-npm run dev
-# → http://localhost:3000
-```
-
----
-
-## Deployment (Vercel)
-
-```bash
-npm i -g vercel
-vercel
-```
-
-Set these environment variables in the Vercel dashboard:
-
-| Variable | Required | Description |
-|---|---|---|
-| `GEMINI_API_KEY` | ✅ | Google AI Studio API key |
-| `AUTH_SECRET` | ✅ | ≥32 char random string (`openssl rand -base64 32`) |
-| `DATABASE_URL` | Recommended | Postgres connection string (Neon free tier works) |
-| `RESEND_API_KEY` | Optional | For welcome emails |
-| `EMAIL_FROM` | Optional | Sender address |
-
-> **Vercel note:** The free Serverless filesystem is read-only. Set `DATABASE_URL` to persist data. Neon and Supabase both have generous free tiers.
-
----
-
-## Project Structure
-
-```
-documind/
-├── app/
-│   ├── page.tsx              # Landing page
-│   ├── auth/page.tsx         # Login / Register
-│   ├── chat/page.tsx         # RAG chat interface
-│   ├── collections/page.tsx  # Collection manager
-│   ├── documents/page.tsx    # Document manager
-│   ├── analytics/page.tsx    # Usage charts
-│   ├── export/page.tsx       # Data export
-│   ├── search/page.tsx       # Semantic search
-│   ├── settings/page.tsx     # User settings
-│   ├── profile/page.tsx      # User profile
-│   └── api/
-│       ├── auth/             # Login, register, logout
-│       ├── chat/             # Streaming RAG endpoint
-│       ├── collections/      # CRUD collections
-│       ├── documents/        # CRUD documents
-│       ├── ingest/           # File upload + indexing
-│       ├── me/               # User profile
-│       ├── search/           # Semantic search
-│       └── stats/            # Workspace analytics
-├── components/
-│   ├── app/                  # AuthGate, Citations, CollectionPicker
-│   └── shared/               # Navigation, AppSidebar, Logo
-├── lib/
-│   ├── auth.ts               # Session token logic
-│   ├── embeddings.ts         # Gemini embedding calls
-│   ├── llm.ts                # Gemini chat + streaming
-│   ├── chunk.ts              # Text chunking
-│   ├── analytics.ts          # Stats aggregation
-│   └── storage/              # JSON + Postgres adapters
-└── proxy.ts                  # Edge-runtime route guard (Next.js 16)
-```
-
----
-
-## API Reference
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/auth/register` | Create account |
-| `POST` | `/api/auth/login` | Sign in, set session cookie |
-| `POST` | `/api/auth/logout` | Clear session cookie |
-| `GET` | `/api/me` | Get current user |
-| `PATCH` | `/api/me` | Update profile name |
-| `GET` | `/api/collections` | List user collections |
-| `POST` | `/api/collections` | Create collection |
-| `DELETE` | `/api/collections/:id` | Delete collection + docs |
-| `GET` | `/api/documents` | List documents (optionally filtered) |
-| `POST` | `/api/ingest` | Upload + index a document |
-| `DELETE` | `/api/documents/:id` | Delete document + chunks |
-| `POST` | `/api/chat` | Streaming RAG answer |
-| `POST` | `/api/search` | Semantic search query |
-| `GET` | `/api/stats` | Workspace analytics data |
-
----
-
-## Tech Stack
+## Tech stack
 
 | Layer | Technology |
 |---|---|
 | Framework | Next.js 16 (App Router, Turbopack) |
-| Language | TypeScript 5 |
-| Styling | Tailwind CSS 4 |
-| Animation | Framer Motion 12 |
-| AI — Answers | Google Gemini (gemini-2.0-flash) |
-| AI — Embeddings | Google Gemini (text-embedding-004, 768 dim) |
-| PDF parsing | pdf-parse v2 |
-| Database | Postgres + pgvector (or local JSON) |
-| Auth | HMAC-SHA256 signed cookies |
-| Email | Resend |
-| Deployment | Vercel |
+| Language | TypeScript (strict mode) |
+| Styling | Tailwind CSS v4 |
+| Animations | Framer Motion |
+| Charts | Recharts |
+| Auth | Custom HMAC-signed sessions (Web Crypto API) |
+| Passwords | bcryptjs |
+| Vectors | pgvector (PostgreSQL) or local JSON fallback |
+| AI / LLM | Any OpenAI-compatible API |
+| Email | Resend (optional) |
+| Deployment | Vercel (recommended) |
 
 ---
 
-## Changelog
+## Quick start (local)
 
-### v3.2.1 (current)
-- **Build fix**: Replaced `middleware.ts` with `proxy.ts` (Next.js 16 convention)
-- **Build fix**: Rewrote route guard using Web Crypto API — no Node.js modules in Edge Runtime
-- **Build fix**: Added `export const runtime = 'nodejs'` to all API routes
-- **Build fix**: Fixed React version mismatch (19.0.0 → 19.2.7)
-- **Landing page**: Complete redesign with animated stats, floating doc cards, checklist section, mobile nav
-- **Auth page**: Enhanced UI with show/hide password, success states, better validation
-- **Navigation**: Mobile hamburger menu, active section highlighting, "Get started" CTA
+```bash
+# 1 — Clone
+git clone https://github.com/ShaikMuzzammil/documind.git
+cd documind
 
-### v3.2.0
-- Full rebuild: 104+ file codebase
-- PostgreSQL + pgvector adapter
-- Gemini AI integration with streaming
-- Analytics dashboard
-- Settings with 4 tabs
-- Profile page
-- Export page
-- Semantic search page
-- HMAC session auth
+# 2 — Install dependencies
+npm install
+
+# 3 — Create your environment file
+cp .env.example .env.local
+# Edit .env.local — see the Configuration section below
+
+# 4 — Run in development
+npm run dev
+```
+
+Open http://localhost:3000, register an account, and upload your first document.
 
 ---
 
-## Author
+## Configuration — environment variables
 
-**Nova (Shaik Muzzammil)**
-Computer Science & Engineering · Amrita Vishwa Vidyapeetham, Chennai (2028)
-[GitHub: @ShaikMuzzammil](https://github.com/ShaikMuzzammil) · muzzammil160806@gmail.com
+Copy `.env.example` to `.env.local` for local development, or set these in your Vercel project's **Settings → Environment Variables** for production.
+
+### Required variables
+
+| Variable | Description | Example |
+|---|---|---|
+| `AUTH_SECRET` | Random 32-character secret for signing session tokens. **Change this before deploying.** | `openssl rand -hex 32` |
+
+```bash
+AUTH_SECRET=your-random-32-char-secret-here
+```
+
+### AI / LLM provider
+
+DocuMind uses any **OpenAI-compatible** API. Set these three variables:
+
+| Variable | Description |
+|---|---|
+| `LLM_API_KEY` | Your API key from the provider |
+| `LLM_BASE_URL` | The provider's OpenAI-compatible base URL |
+| `LLM_CHAT_MODEL` | The model name to use for chat completions |
+
+> **Without `LLM_API_KEY`** — document upload, indexing, semantic search, and citation retrieval all work. Only AI-generated answers in Chat are disabled.
+
+### Supported providers
+
+#### Google Gemini *(recommended — free tier available)*
+
+1. Go to [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+2. Create an API key (no credit card needed)
+3. Set these variables:
+
+```env
+LLM_API_KEY=AIza...your_gemini_key
+LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+LLM_CHAT_MODEL=gemini-2.5-flash
+```
+
+#### OpenAI
+
+1. Go to [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+2. Create an API key
+3. Set these variables:
+
+```env
+LLM_API_KEY=sk-...your_openai_key
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_CHAT_MODEL=gpt-4o-mini
+```
+
+#### Groq *(free tier — ultra-fast inference)*
+
+1. Go to [https://console.groq.com/keys](https://console.groq.com/keys)
+2. Create an API key (no credit card needed)
+3. Set these variables:
+
+```env
+LLM_API_KEY=gsk_...your_groq_key
+LLM_BASE_URL=https://api.groq.com/openai/v1
+LLM_CHAT_MODEL=llama-3.1-70b-versatile
+```
+
+#### Any other OpenAI-compatible provider
+
+Set `LLM_BASE_URL` to the provider's base URL (ending before `/chat/completions`), `LLM_API_KEY` to your key, and `LLM_CHAT_MODEL` to the model name. Examples: OpenRouter, Together AI, Mistral AI, local Ollama, etc.
+
+---
+
+### Database (optional, recommended for production)
+
+By default DocuMind stores everything in a local JSON file (`/tmp/documind-store.json`). This is fine for development and demos but **will reset on Vercel deployments**.
+
+For production, use **PostgreSQL with pgvector**:
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+
+```env
+DATABASE_URL=postgresql://user:password@host:5432/dbname?sslmode=require
+```
+
+**Recommended providers:** [Neon](https://neon.tech) (free tier), [Supabase](https://supabase.com) (free tier), [Railway](https://railway.app), or any PostgreSQL host.
+
+The pgvector extension must be enabled on your database. Most managed providers have it available:
+
+```sql
+-- Run once on your database
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+DocuMind will automatically create the required tables on first run when `DATABASE_URL` is set.
+
+---
+
+### Email (optional)
+
+Sends a welcome email when a user registers. Requires a free [Resend](https://resend.com) account.
+
+| Variable | Description |
+|---|---|
+| `RESEND_API_KEY` | Your Resend API key |
+| `EMAIL_FROM` | The sender address (must be a verified domain in Resend) |
+
+```env
+RESEND_API_KEY=re_...your_resend_key
+EMAIL_FROM=noreply@yourdomain.com
+```
+
+---
+
+### Complete `.env.example`
+
+```env
+# ── Required ──────────────────────────────────────────────────────────
+AUTH_SECRET=change-this-to-a-random-32-char-secret
+
+# ── AI / LLM (choose one provider) ───────────────────────────────────
+# Google Gemini (recommended, free tier)
+LLM_API_KEY=
+LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+LLM_CHAT_MODEL=gemini-2.5-flash
+
+# ── Database (optional, recommended for production) ───────────────────
+DATABASE_URL=
+
+# ── Email (optional) ──────────────────────────────────────────────────
+RESEND_API_KEY=
+EMAIL_FROM=
+```
+
+---
+
+## Deploy to Vercel
+
+1. **Fork** or push this repository to your GitHub account
+2. Go to [vercel.com/new](https://vercel.com/new) and import your repository
+3. In **Environment Variables**, add at minimum:
+   - `AUTH_SECRET` — a random 32-character string
+   - `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_CHAT_MODEL` — from your chosen provider
+   - `DATABASE_URL` — a PostgreSQL connection string (for persistent storage)
+4. Click **Deploy**
+
+After adding or changing environment variables in Vercel, go to **Deployments → ⋯ → Redeploy** for the changes to take effect. The AI status indicator in the sidebar will update automatically.
+
+---
+
+## How RAG works in DocuMind
+
+**Retrieval-Augmented Generation (RAG)** is a technique that grounds AI answers in your documents:
+
+1. **Upload** — a document is uploaded and its text is extracted
+2. **Chunk** — the text is split into ~512-token segments with paragraph-aware splitting
+3. **Embed** — each chunk is converted to a vector representation (embedding) that captures its semantic meaning
+4. **Store** — chunks and vectors are stored in PostgreSQL + pgvector (or local JSON)
+5. **Query** — when you ask a question, it is also embedded and compared against all stored chunk vectors using cosine similarity
+6. **Retrieve** — the top-k most similar chunks are returned as context
+7. **Generate** — only those retrieved chunks (not full documents) are sent to the AI provider along with your question
+8. **Answer** — the AI generates a grounded answer referencing the provided passages, which DocuMind surfaces as inline citations
+
+This means answers are factually grounded in your documents, full documents are never sent to the AI, and the system works even with very large document collections.
+
+---
+
+## File types supported
+
+| Type | Extension |
+|---|---|
+| PDF | `.pdf` |
+| Plain text | `.txt` |
+| Markdown | `.md` |
+| CSV | `.csv` |
+| JSON | `.json` |
+| JavaScript | `.js`, `.jsx`, `.mjs` |
+| TypeScript | `.ts`, `.tsx` |
+| Python | `.py` |
+| Rust | `.rs` |
+| Go | `.go` |
+| Shell | `.sh`, `.bash` |
+
+> **Note:** Scanned PDFs without a text layer (image-only PDFs) are not supported. Only PDFs with embedded text content can be indexed.
+
+---
+
+## Project structure
+
+```
+documind/
+├── app/
+│   ├── api/                  # API routes (auth, documents, chat, search, etc.)
+│   ├── auth/                 # Sign in / register page
+│   ├── chat/                 # Chat workspace
+│   ├── collections/          # Collection management
+│   ├── documents/            # Document upload and management
+│   ├── analytics/            # Workspace analytics
+│   ├── search/               # Semantic search
+│   ├── settings/             # Account settings
+│   ├── export/               # Data export
+│   ├── help/                 # Guides and documentation
+│   ├── profile/              # User profile
+│   ├── layout.tsx            # Root layout
+│   └── page.tsx              # Landing page
+├── components/
+│   ├── app/                  # Application components (AuthGate, CollectionPicker, etc.)
+│   └── shared/               # Shared components (Navigation, AppSidebar, Logo)
+├── lib/
+│   ├── storage/              # Storage adapters (PostgreSQL + pgvector / JSON fallback)
+│   ├── auth.ts               # Session management (HMAC-SHA256, bcrypt)
+│   ├── llm.ts                # LLM client (OpenAI-compatible)
+│   ├── embeddings.ts         # Embedding generation
+│   ├── chunk.ts              # Document chunking
+│   ├── analytics.ts          # Workspace statistics
+│   ├── types.ts              # Shared TypeScript types
+│   └── utils.ts              # Utility functions
+├── proxy.ts                  # Next.js 16 Edge route guard (replaces middleware.ts)
+├── README.md                 # This file
+└── .env.example              # Environment variable template
+```
+
+---
+
+## FAQ
+
+**Why does chat say "AI answers not turned on"?**
+You need to set `LLM_API_KEY` in your environment variables. See the [AI / LLM provider](#ai--llm-provider) section above. Google Gemini has a free tier that requires no credit card.
+
+**Data resets every deployment on Vercel — how do I fix it?**
+Set `DATABASE_URL` to a PostgreSQL connection string. Without it, data is stored in `/tmp` which is cleared on each Vercel deployment. Neon and Supabase both have free PostgreSQL tiers with pgvector support.
+
+**Can I run this locally without any cloud services?**
+Yes. Run `npm run dev` without any environment variables set. You get local JSON storage, no email, and no AI answers — but uploads, indexing, and semantic search all work.
+
+**Is this secure enough for sensitive documents?**
+DocuMind is designed for self-hosted use where you control the infrastructure. Session tokens are HMAC-signed, passwords are bcrypt-hashed, and data is isolated per user. For highly sensitive data, review the full codebase and deploy on infrastructure you own and trust.
+
+**Can I add my own AI model?**
+Yes. Any provider that exposes an OpenAI-compatible `/chat/completions` endpoint works. Set `LLM_BASE_URL` to that endpoint and `LLM_CHAT_MODEL` to the model name.
 
 ---
 
 <div align="center">
-  <sub>Built with Next.js, TypeScript, and Google Gemini · DocuMind v3.2.1</sub>
+Built with Next.js · TypeScript · pgvector · Tailwind CSS
 </div>
