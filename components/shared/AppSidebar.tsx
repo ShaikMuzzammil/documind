@@ -12,15 +12,15 @@ import { useUser } from '@/lib/use-user';
 import Logo from './Logo';
 
 const NAV_ITEMS = [
-  { href: '/chat',        icon: MessageSquare, label: 'Chat',        badge: null },
-  { href: '/documents',   icon: FileText,      label: 'Documents',   badge: null },
-  { href: '/collections', icon: FolderOpen,    label: 'Collections', badge: null },
-  { href: '/analytics',   icon: BarChart3,     label: 'Analytics',   badge: null },
-  { href: '/export',      icon: Download,      label: 'Export',      badge: null },
-  { href: '/search',      icon: Search,        label: 'Search',      badge: null },
-  { href: '/help',        icon: HelpCircle,    label: 'Help',        badge: null },
-  { href: '/settings',    icon: Settings,      label: 'Settings',    badge: null },
-  { href: '/profile',     icon: User,          label: 'Profile',     badge: null },
+  { href: '/chat',        icon: MessageSquare, label: 'Chat'        },
+  { href: '/documents',   icon: FileText,      label: 'Documents'   },
+  { href: '/collections', icon: FolderOpen,    label: 'Collections' },
+  { href: '/analytics',   icon: BarChart3,     label: 'Analytics'   },
+  { href: '/export',      icon: Download,      label: 'Export'      },
+  { href: '/search',      icon: Search,        label: 'Search'      },
+  { href: '/help',        icon: HelpCircle,    label: 'Help'        },
+  { href: '/settings',    icon: Settings,      label: 'Settings'    },
+  { href: '/profile',     icon: User,          label: 'Profile'     },
 ];
 
 export default function AppSidebar() {
@@ -35,9 +35,8 @@ export default function AppSidebar() {
   const initRef = useRef(false);
 
   useEffect(() => {
-    const appPaths = ['/chat', '/documents', '/collections', '/analytics', '/export', '/search', '/help', '/settings', '/profile'];
-    const isApp = appPaths.some((p) => pathname.startsWith(p));
-    setShow(isApp);
+    const appPaths = NAV_ITEMS.map(n => n.href);
+    setShow(appPaths.some((p) => pathname.startsWith(p)));
   }, [pathname]);
 
   const logout = async () => {
@@ -69,11 +68,10 @@ export default function AppSidebar() {
           <span className="font-bold text-sm tracking-tight">
             Docu<span className="gradient-text">Mind</span>
           </span>
-          <span className="ml-auto text-[9px] font-mono text-text-muted bg-bg-card border border-border rounded px-1.5 py-0.5">v4</span>
+          <span className="ml-auto text-[9px] font-mono text-text-muted bg-bg-card border border-border rounded px-1.5 py-0.5">v5</span>
         </div>
 
         <div className="flex-1 overflow-y-auto py-3 flex flex-col">
-          {/* Back to home */}
           <Link
             href="/"
             className="flex items-center gap-2 px-3 py-1.5 mx-2 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors mb-2"
@@ -82,7 +80,6 @@ export default function AppSidebar() {
             Back to Home
           </Link>
 
-          {/* AI not configured warning */}
           {!loading && !aiConfigured && (
             <Link
               href="/settings"
@@ -126,7 +123,7 @@ export default function AppSidebar() {
 
         {/* User footer */}
         <div className="border-t border-border p-3">
-          <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-bg-hover transition-colors">
+          <Link href="/profile" className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-bg-hover transition-colors">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center text-white text-xs font-bold shrink-0">
               {loading ? '…' : initials}
             </div>
@@ -135,13 +132,13 @@ export default function AppSidebar() {
               <p className="text-[10px] text-text-muted truncate">{user?.email || '—'}</p>
             </div>
             <button
-              onClick={logout}
+              onClick={(e) => { e.preventDefault(); logout(); }}
               title="Sign out"
               className="p-1.5 rounded-lg text-text-muted hover:bg-bg-card hover:text-text-primary transition-colors shrink-0"
             >
               <LogOut className="h-3.5 w-3.5" />
             </button>
-          </div>
+          </Link>
         </div>
       </aside>
 
@@ -149,11 +146,11 @@ export default function AppSidebar() {
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-bg-secondary/90 backdrop-blur">
         <div className="flex">
           {[
-            { href: '/chat',      icon: MessageSquare, label: 'Chat'    },
-            { href: '/documents', icon: FileText,      label: 'Docs'    },
-            { href: '/collections', icon: Layers,      label: 'Folders' },
-            { href: '/search',    icon: Search,        label: 'Search'  },
-            { href: '/settings',  icon: Settings,      label: 'More'    },
+            { href: '/chat',        icon: MessageSquare, label: 'Chat'    },
+            { href: '/documents',   icon: FileText,      label: 'Docs'    },
+            { href: '/collections', icon: Layers,        label: 'Folders' },
+            { href: '/search',      icon: Search,        label: 'Search'  },
+            { href: '/settings',    icon: Settings,      label: 'More'    },
           ].map(({ href, icon: Icon, label }) => {
             const active = pathname.startsWith(href);
             return (

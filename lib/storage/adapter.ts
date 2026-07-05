@@ -25,6 +25,7 @@ export interface StorageAdapter {
   getCollections(userId: string): Promise<Collection[]>;
   createCollection(c: Collection): Promise<Collection>;
   deleteCollection(userId: string, id: string): Promise<void>;
+  updateCollection?(userId: string, id: string, collection: Collection): Promise<void>;
 
   // Documents
   getDocuments(userId: string, collectionId?: string): Promise<DocumentMeta[]>;

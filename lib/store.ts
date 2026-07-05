@@ -45,3 +45,17 @@ export async function search(
 ): Promise<Citation[]> {
   return getStorage().search(queryEmbedding, opts);
 }
+
+export async function updateCollection(userId: string, id: string, name: string, description?: string): Promise<void> {
+  const storage = getStorage();
+  const collections = await storage.getCollections(userId);
+  const col = collections.find(c => c.id === id);
+  if (!col) return;
+  const updated = { ...col, name, description: description ?? col.description };
+  if (storage.updateCollection) {
+    await storage.updateCollection(userId, id, updated);
+  } else {
+    await storage.deleteCollection(userId, id);
+    await storage.createCollection(updated);
+  }
+}

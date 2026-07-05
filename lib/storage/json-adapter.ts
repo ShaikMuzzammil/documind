@@ -48,6 +48,7 @@ async function writeJson(file: string, data: unknown): Promise<void> {
   } catch {
     throw new LocalStorageUnavailableError();
   }
+
 }
 
 export class JsonAdapter implements StorageAdapter {
@@ -110,6 +111,13 @@ export class JsonAdapter implements StorageAdapter {
       (ch) => !(ch.collectionId === id && ch.userId === userId),
     );
     await writeJson(CHUNKS_FILE, chunks);
+  }
+
+  async updateCollection(_userId: string, id: string, collection: Collection): Promise<void> {
+    const cols = await readJson<Collection[]>(COLLECTIONS_FILE, []);
+    const idx = cols.findIndex((c) => c.id === id);
+    if (idx !== -1) cols[idx] = collection;
+    await writeJson(COLLECTIONS_FILE, cols);
   }
 
   // Documents

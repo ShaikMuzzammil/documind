@@ -11,8 +11,8 @@ const eslintConfig = [
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
   {
     rules: {
-      // Allow void return in async callbacks that we intentionally don't await
       '@typescript-eslint/no-floating-promises': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
     },
   },
 ];
