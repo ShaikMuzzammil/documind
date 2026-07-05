@@ -24,6 +24,12 @@ export const metadata: Metadata = {
     'Upload documents, ask questions in plain language, and get grounded, cited answers from your own files. A private RAG workspace powered by your own AI keys.',
   keywords: ['document AI', 'RAG', 'vector search', 'document intelligence', 'chat with PDF'],
   robots: { index: true, follow: true },
+  icons: {
+    icon: [
+      { url: '/favicon.png', type: 'image/png' },
+    ],
+    apple: '/favicon.png',
+  },
 };
 
 export const viewport: Viewport = {

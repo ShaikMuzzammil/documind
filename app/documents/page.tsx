@@ -5,7 +5,8 @@ import Link from 'next/link';
 import {
   AlertCircle, CheckCircle2, FileText, FolderPlus, Loader2,
   RefreshCw, Search, Trash2, UploadCloud, X, ChevronDown,
-  File, FileCode, Database, Hash,
+  File, FileCode, Database, Hash, Eye, MessageSquare, Plus,
+  Filter, ArrowUpDown, ChevronUp,
 } from 'lucide-react';
 import CollectionPicker from '@/components/app/CollectionPicker';
 import AuthGate from '@/components/app/AuthGate';
@@ -14,6 +15,8 @@ import { Collection, DocumentMeta } from '@/lib/types';
 import { formatBytes, relativeTime } from '@/lib/utils';
 
 type Notice = { type: 'success' | 'error'; text: string } | null;
+type SortField = 'name' | 'size' | 'createdAt' | 'status';
+type SortDir = 'asc' | 'desc';
 
 function statusClass(status: DocumentMeta['status']) {
   if (status === 'ready') return 'text-success bg-success/10 border-success/20';
@@ -21,17 +24,92 @@ function statusClass(status: DocumentMeta['status']) {
   return 'text-danger bg-danger/10 border-danger/20';
 }
 
-function FileTypeIcon({ type }: { type: string }) {
-  const t = type.toLowerCase();
-  if (t === 'pdf') return <div className="text-red-400 font-bold text-[10px] bg-red-400/10 rounded px-1 py-0.5">PDF</div>;
-  if (['md', 'txt'].includes(t)) return <File className="h-3.5 w-3.5 text-blue-400" />;
-  if (['csv', 'json'].includes(t)) return <Database className="h-3.5 w-3.5 text-green-400" />;
-  if (['js', 'ts', 'py', 'rs'].includes(t)) return <FileCode className="h-3.5 w-3.5 text-purple-400" />;
+function getFileExt(type: string, name: string): string {
+  if (name.toLowerCase().endsWith('.pdf')) return 'PDF';
+  const nameExt = name.split('.').pop()?.toLowerCase() || '';
+  if (nameExt) return nameExt.toUpperCase();
+  return type.split('/').pop()?.toUpperCase() || 'FILE';
+}
+
+function FileTypeIcon({ type, name }: { type: string; name: string }) {
+  const ext = getFileExt(type, name).toLowerCase();
+  if (ext === 'pdf') return <div className="text-red-400 font-bold text-[10px] bg-red-400/10 rounded px-1 py-0.5">PDF</div>;
+  if (['md', 'txt'].includes(ext)) return <File className="h-3.5 w-3.5 text-blue-400" />;
+  if (['csv', 'json'].includes(ext)) return <Database className="h-3.5 w-3.5 text-green-400" />;
+  if (['js', 'ts', 'tsx', 'jsx', 'py', 'rs', 'go', 'java', 'c', 'cpp'].includes(ext)) return <FileCode className="h-3.5 w-3.5 text-purple-400" />;
   return <Hash className="h-3.5 w-3.5 text-text-muted" />;
 }
 
 function collectionName(collections: Collection[], id: string) {
   return collections.find((c) => c.id === id)?.name || 'Unknown';
+}
+
+// Document detail modal
+function DocumentModal({ doc, onClose }: { doc: DocumentMeta; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative glass rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
+              <FileText className="h-5 w-5 text-accent" />
+            </div>
+            <div>
+              <h2 className="font-bold text-base leading-tight">{doc.name}</h2>
+              <p className="text-xs text-text-muted mt-0.5">{getFileExt(doc.type, doc.name)} · {formatBytes(doc.size)}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { label: 'Status', value: doc.status, isStatus: true },
+            { label: 'Chunks', value: String(doc.chunkCount) },
+            { label: 'Size', value: formatBytes(doc.size) },
+            { label: 'Indexed', value: relativeTime(doc.createdAt) },
+          ].map(({ label, value, isStatus }) => (
+            <div key={label} className="rounded-xl bg-bg-secondary/60 border border-border/50 px-3 py-2.5">
+              <p className="text-xs text-text-muted mb-1">{label}</p>
+              {isStatus ? (
+                <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusClass(doc.status as DocumentMeta['status'])}`}>
+                  {doc.status === 'ready' && <div className="h-1.5 w-1.5 rounded-full bg-success" />}
+                  {doc.status}
+                </span>
+              ) : (
+                <p className="text-sm font-semibold text-text-primary">{value}</p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {doc.error && (
+          <div className="rounded-xl border border-danger/25 bg-danger/10 px-4 py-3">
+            <p className="text-xs font-semibold text-danger mb-1">Indexing error</p>
+            <p className="text-xs text-danger/80">{doc.error}</p>
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-2">
+          <Link
+            href={`/chat?collectionId=${doc.collectionId}`}
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+          >
+            <MessageSquare className="h-4 w-4" /> Chat about this
+          </Link>
+          <Link
+            href={`/search`}
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-bg-card px-4 py-2.5 text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors"
+          >
+            <Search className="h-4 w-4" /> Search docs
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function DocumentsPage() {
@@ -48,6 +126,10 @@ export default function DocumentsPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [notice, setNotice] = useState<Notice>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [viewDoc, setViewDoc] = useState<DocumentMeta | null>(null);
+  const [sortField, setSortField] = useState<SortField>('createdAt');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'ready' | 'error' | 'processing'>('all');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -83,18 +165,36 @@ export default function DocumentsPage() {
     if (!uploadCollectionId && collections.length) setUploadCollectionId(collections[0].id);
   }, [collections, uploadCollectionId]);
 
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDir('desc'); }
+  };
+
   const filteredDocuments = useMemo(() => {
+    let docs = [...documents];
     const needle = query.trim().toLowerCase();
-    if (!needle) return documents;
-    return documents.filter((doc) => doc.name.toLowerCase().includes(needle));
-  }, [documents, query]);
+    if (needle) docs = docs.filter(d => d.name.toLowerCase().includes(needle));
+    if (statusFilter !== 'all') docs = docs.filter(d => d.status === statusFilter);
+    docs.sort((a, b) => {
+      let va: string | number = a[sortField] as string | number;
+      let vb: string | number = b[sortField] as string | number;
+      if (sortField === 'size') { va = a.size; vb = b.size; }
+      if (typeof va === 'string') va = va.toLowerCase();
+      if (typeof vb === 'string') vb = vb.toLowerCase();
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return docs;
+  }, [documents, query, statusFilter, sortField, sortDir]);
 
   const stats = useMemo(() => {
-    const ready = documents.filter((doc) => doc.status === 'ready').length;
-    const processing = documents.filter((doc) => doc.status === 'processing').length;
-    const chunks = documents.reduce((sum, doc) => sum + doc.chunkCount, 0);
-    const bytes = documents.reduce((sum, doc) => sum + doc.size, 0);
-    return { ready, processing, chunks, bytes };
+    const ready = documents.filter(d => d.status === 'ready').length;
+    const processing = documents.filter(d => d.status === 'processing').length;
+    const errors = documents.filter(d => d.status === 'error').length;
+    const chunks = documents.reduce((sum, d) => sum + d.chunkCount, 0);
+    const bytes = documents.reduce((sum, d) => sum + d.size, 0);
+    return { ready, processing, errors, chunks, bytes };
   }, [documents]);
 
   const createQuickCollection = async () => {
@@ -114,7 +214,6 @@ export default function DocumentsPage() {
     form.append('file', file);
     form.append('collectionId', uploadCollectionId);
 
-    // Simulate progress
     const progressInterval = setInterval(() => {
       setUploadProgress(p => Math.min(p + 8, 85));
     }, 200);
@@ -126,11 +225,7 @@ export default function DocumentsPage() {
 
       let data: { document?: DocumentMeta; error?: string } = {};
       try { data = await res.json(); } catch {
-        throw new Error(
-          res.status === 413
-            ? 'File is too large. Try a smaller file.'
-            : `Upload failed (server returned ${res.status}).`,
-        );
+        throw new Error(res.status === 413 ? 'File is too large. Try a smaller file.' : `Upload failed (${res.status}).`);
       }
       if (!res.ok) throw new Error(data.error || 'Upload failed');
       setNotice({
@@ -162,8 +257,15 @@ export default function DocumentsPage() {
     setDeleting(null);
   };
 
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+    return sortDir === 'asc' ? <ChevronUp className="h-3 w-3 text-accent" /> : <ChevronDown className="h-3 w-3 text-accent" />;
+  };
+
   return (
     <AuthGate>
+      {viewDoc && <DocumentModal doc={viewDoc} onClose={() => setViewDoc(null)} />}
+
       <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8 pb-24 lg:pb-8">
         <div className="mx-auto max-w-7xl space-y-6">
           <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -187,25 +289,24 @@ export default function DocumentsPage() {
           </header>
 
           {/* Stats */}
-          <section className="grid gap-3 sm:grid-cols-4">
+          <section className="grid gap-3 sm:grid-cols-5">
             {[
-              { label: 'Ready', value: stats.ready, color: 'text-success' },
-              { label: 'Processing', value: stats.processing, color: 'text-accent-2' },
-              { label: 'Total Chunks', value: stats.chunks, color: 'text-accent' },
-              { label: 'Stored', value: formatBytes(stats.bytes), color: 'text-text-primary' },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="glass rounded-xl p-4">
+              { label: 'Ready', value: stats.ready, color: 'text-success', onClick: () => setStatusFilter(statusFilter === 'ready' ? 'all' : 'ready') },
+              { label: 'Processing', value: stats.processing, color: 'text-accent-2', onClick: () => setStatusFilter(statusFilter === 'processing' ? 'all' : 'processing') },
+              { label: 'Errors', value: stats.errors, color: 'text-danger', onClick: () => setStatusFilter(statusFilter === 'error' ? 'all' : 'error') },
+              { label: 'Total Chunks', value: stats.chunks, color: 'text-accent', onClick: () => {} },
+              { label: 'Stored', value: formatBytes(stats.bytes), color: 'text-text-primary', onClick: () => {} },
+            ].map(({ label, value, color, onClick }) => (
+              <button key={label} onClick={onClick} className={`glass rounded-xl p-4 text-left transition-all hover:border-accent/30 ${statusFilter === label.toLowerCase().replace(' ', '') ? 'border-accent/40 bg-accent/5' : ''}`}>
                 <p className="text-xs text-text-muted">{label}</p>
                 <p className={`mt-1.5 text-2xl font-bold ${color}`}>{value}</p>
-              </div>
+              </button>
             ))}
           </section>
 
           {notice && (
             <div className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${
-              notice.type === 'success'
-                ? 'border-success/25 bg-success/10 text-success'
-                : 'border-danger/25 bg-danger/10 text-danger'
+              notice.type === 'success' ? 'border-success/25 bg-success/10 text-success' : 'border-danger/25 bg-danger/10 text-danger'
             }`}>
               {notice.type === 'success' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />}
               <span className="flex-1">{notice.text}</span>
@@ -219,7 +320,7 @@ export default function DocumentsPage() {
               <div className="glass rounded-xl p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <UploadCloud className="h-5 w-5 text-accent" />
-                  <h2 className="font-semibold">Ingest a document</h2>
+                  <h2 className="font-semibold">Add Document</h2>
                 </div>
 
                 {collections.length === 0 && !loadingCollections ? (
@@ -266,27 +367,32 @@ export default function DocumentsPage() {
                         <div>
                           <p className="text-sm font-medium text-text-primary">{file.name}</p>
                           <p className="text-xs text-text-muted mt-1">{formatBytes(file.size)} — ready to upload</p>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                            className="mt-2 text-xs text-text-muted hover:text-danger transition-colors"
+                          >
+                            Remove
+                          </button>
                         </div>
                       ) : (
                         <div>
                           <p className="text-sm font-medium">Drop a file or click to choose</p>
-                          <p className="mt-1 text-xs text-text-muted">PDF, TXT, MD, CSV, JSON, and code files</p>
+                          <p className="mt-1 text-xs text-text-muted">PDF, TXT, MD, CSV, JSON, and code files (max 15MB)</p>
                         </div>
                       )}
                     </div>
-                    <input id="file-input" type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                    <input id="file-input" type="file" className="hidden"
+                      accept=".pdf,.txt,.md,.markdown,.csv,.json,.js,.ts,.tsx,.jsx,.py,.java,.c,.cpp,.h,.go,.rs,.rb,.php,.html,.css,.yml,.yaml,.xml,.sql"
+                      onChange={(e) => setFile(e.target.files?.[0] || null)}
+                    />
 
-                    {/* Progress bar */}
                     {uploading && (
                       <div className="mt-3">
                         <div className="flex justify-between text-xs text-text-muted mb-1">
                           <span>Indexing…</span><span>{uploadProgress}%</span>
                         </div>
                         <div className="h-1.5 w-full bg-bg-hover rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-accent rounded-full transition-all duration-300"
-                            style={{ width: `${uploadProgress}%` }}
-                          />
+                          <div className="h-full bg-accent rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
                         </div>
                       </div>
                     )}
@@ -299,7 +405,7 @@ export default function DocumentsPage() {
                       {uploading ? (
                         <><Loader2 className="h-4 w-4 animate-spin" /> Indexing…</>
                       ) : (
-                        <><UploadCloud className="h-4 w-4" /> Upload and index</>
+                        <><Plus className="h-4 w-4" /> Upload and index</>
                       )}
                     </button>
                   </>
@@ -310,12 +416,26 @@ export default function DocumentsPage() {
               <div className="glass rounded-xl p-4">
                 <p className="text-xs font-semibold text-text-muted mb-3">SUPPORTED FORMATS</p>
                 <div className="grid grid-cols-2 gap-1.5 text-xs text-text-secondary">
-                  {['PDF', 'TXT', 'Markdown', 'CSV', 'JSON', 'JavaScript', 'TypeScript', 'Python'].map(f => (
+                  {['PDF', 'TXT', 'Markdown', 'CSV', 'JSON', 'JavaScript', 'TypeScript', 'Python', 'Go', 'Rust', 'Java', 'C/C++'].map(f => (
                     <div key={f} className="flex items-center gap-1.5">
                       <div className="h-1 w-1 rounded-full bg-success" />{f}
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Quick links */}
+              <div className="glass rounded-xl p-4 space-y-2">
+                <p className="text-xs font-semibold text-text-muted mb-2">QUICK ACTIONS</p>
+                <Link href="/collections" className="flex items-center gap-2 text-xs text-text-secondary hover:text-accent transition-colors py-1">
+                  <FolderPlus className="h-3.5 w-3.5" /> Manage collections
+                </Link>
+                <Link href="/chat" className="flex items-center gap-2 text-xs text-text-secondary hover:text-accent transition-colors py-1">
+                  <MessageSquare className="h-3.5 w-3.5" /> Chat with documents
+                </Link>
+                <Link href="/search" className="flex items-center gap-2 text-xs text-text-secondary hover:text-accent transition-colors py-1">
+                  <Search className="h-3.5 w-3.5" /> Search passages
+                </Link>
               </div>
             </div>
 
@@ -324,16 +444,23 @@ export default function DocumentsPage() {
               <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="font-semibold">Indexed documents</h2>
-                  <p className="text-xs text-text-muted">Auto-refreshes every 8 seconds</p>
+                  <p className="text-xs text-text-muted">Auto-refreshes every 8s · {filteredDocuments.length} shown</p>
                 </div>
-                <div className="relative w-full sm:w-64">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Filter filenames…"
-                    className="w-full rounded-lg border border-border bg-bg-card py-2 pl-9 pr-3 text-sm outline-none focus:border-accent/50"
-                  />
+                <div className="flex items-center gap-2">
+                  {statusFilter !== 'all' && (
+                    <button onClick={() => setStatusFilter('all')} className="inline-flex items-center gap-1 rounded-lg border border-accent/30 bg-accent/10 px-2 py-1 text-xs text-accent hover:bg-accent/20 transition-colors">
+                      <Filter className="h-3 w-3" /> {statusFilter} <X className="h-3 w-3" />
+                    </button>
+                  )}
+                  <div className="relative w-full sm:w-64">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Filter filenames…"
+                      className="w-full rounded-lg border border-border bg-bg-card py-2 pl-9 pr-3 text-sm outline-none focus:border-accent/50"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -346,7 +473,7 @@ export default function DocumentsPage() {
                   <FileText className="mx-auto h-10 w-10 text-text-muted opacity-40" />
                   <h3 className="mt-3 font-semibold">No documents found</h3>
                   <p className="mx-auto mt-2 max-w-sm text-sm text-text-muted">
-                    {query ? `No files match "${query}".` : 'Upload your first file to get started.'}
+                    {query || statusFilter !== 'all' ? 'Try clearing your filters.' : 'Upload your first document to get started.'}
                   </p>
                 </div>
               ) : (
@@ -354,24 +481,40 @@ export default function DocumentsPage() {
                   <table className="w-full min-w-[640px] text-left text-sm">
                     <thead className="bg-bg-secondary/60 text-xs uppercase tracking-wide text-text-muted">
                       <tr>
-                        <th className="px-4 py-3 font-medium">Document</th>
+                        <th className="px-4 py-3 font-medium">
+                          <button onClick={() => toggleSort('name')} className="flex items-center gap-1 hover:text-text-primary transition-colors">
+                            Document <SortIcon field="name" />
+                          </button>
+                        </th>
                         <th className="px-4 py-3 font-medium">Collection</th>
                         <th className="px-4 py-3 font-medium">Chunks</th>
-                        <th className="px-4 py-3 font-medium">Size</th>
-                        <th className="px-4 py-3 font-medium">Status</th>
-                        <th className="px-4 py-3 font-medium">Added</th>
-                        <th className="px-4 py-3 font-medium"></th>
+                        <th className="px-4 py-3 font-medium">
+                          <button onClick={() => toggleSort('size')} className="flex items-center gap-1 hover:text-text-primary transition-colors">
+                            Size <SortIcon field="size" />
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 font-medium">
+                          <button onClick={() => toggleSort('status')} className="flex items-center gap-1 hover:text-text-primary transition-colors">
+                            Status <SortIcon field="status" />
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 font-medium">
+                          <button onClick={() => toggleSort('createdAt')} className="flex items-center gap-1 hover:text-text-primary transition-colors">
+                            Added <SortIcon field="createdAt" />
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredDocuments.map((doc) => (
                         <tr key={doc.id} className="border-t border-border/70 hover:bg-bg-secondary/30 transition-colors">
-                          <td className="max-w-[240px] px-4 py-3">
+                          <td className="max-w-[220px] px-4 py-3">
                             <div className="flex items-center gap-2">
-                              <FileTypeIcon type={doc.type} />
+                              <FileTypeIcon type={doc.type} name={doc.name} />
                               <div>
                                 <div className="truncate font-medium">{doc.name}</div>
-                                {doc.error && <div className="mt-0.5 truncate text-xs text-danger">{doc.error}</div>}
+                                {doc.error && <div className="mt-0.5 truncate text-xs text-danger" title={doc.error}>{doc.error.slice(0, 60)}…</div>}
                               </div>
                             </div>
                           </td>
@@ -386,15 +529,31 @@ export default function DocumentsPage() {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-text-muted text-xs">{relativeTime(doc.createdAt)}</td>
-                          <td className="px-4 py-3 text-right">
-                            <button
-                              onClick={() => removeDocument(doc.id)}
-                              disabled={deleting === doc.id}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-40"
-                              aria-label={`Delete ${doc.name}`}
-                            >
-                              {deleting === doc.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                            </button>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => setViewDoc(doc)}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-accent/10 hover:text-accent"
+                                title="View details"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </button>
+                              <Link
+                                href={`/chat?collectionId=${doc.collectionId}`}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-accent/10 hover:text-accent"
+                                title="Chat about this"
+                              >
+                                <MessageSquare className="h-3.5 w-3.5" />
+                              </Link>
+                              <button
+                                onClick={() => removeDocument(doc.id)}
+                                disabled={deleting === doc.id}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-40"
+                                title={`Delete ${doc.name}`}
+                              >
+                                {deleting === doc.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}

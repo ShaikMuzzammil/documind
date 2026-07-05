@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   ChevronDown, FolderPlus, MessageSquare, Search, Upload,
   Zap, Shield, Key, BookOpen, ExternalLink, CheckCircle2,
+  Github, Mail, User, Bug, AlertTriangle,
 } from 'lucide-react';
 import AuthGate from '@/components/app/AuthGate';
 
@@ -83,8 +84,8 @@ const TROUBLESHOOTING = [
     a: 'You need to add a LLM_API_KEY environment variable. Go to Settings → AI Engine for a step-by-step guide on getting a free API key from Google Gemini.',
   },
   {
-    q: 'Chat returns empty or vague answers',
-    a: 'Make sure the documents you want answers from have a "Ready" status. Ask a more specific question. If using "All collections", try scoping to a single collection for more focused retrieval.',
+    q: 'Chat returns "could not find the answer"',
+    a: 'Make sure documents have a "Ready" status first. Ask a more specific question, or scope the chat to a specific collection with indexed documents.',
   },
   {
     q: 'I registered but can\'t log in',
@@ -93,6 +94,10 @@ const TROUBLESHOOTING = [
   {
     q: 'Search returns no results',
     a: 'Semantic search requires indexed (Ready) documents. Make sure you have documents uploaded and that their status shows Ready. The search uses meaning, not keywords, so try broader terms.',
+  },
+  {
+    q: 'PDF upload fails with an error',
+    a: 'Ensure the PDF contains a text layer (not just scanned images). DocuMind parses text-based PDFs. For scanned PDFs you\'ll need to run OCR first to convert them to text-based PDFs.',
   },
   {
     q: 'Environment variables not working',
@@ -123,7 +128,7 @@ function Accordion({ items }: { items: { q: string; a: string }[] }) {
   );
 }
 
-function GuideCard({ guide, index }: { guide: typeof GUIDES[0]; index: number }) {
+function GuideCard({ guide }: { guide: typeof GUIDES[0] }) {
   const [expanded, setExpanded] = useState(false);
   const [checkedSteps, setCheckedSteps] = useState<Set<number>>(new Set());
 
@@ -187,10 +192,55 @@ export default function HelpPage() {
     <AuthGate>
       <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8 pb-24 lg:pb-8">
         <div className="mx-auto max-w-3xl space-y-8">
+
+          {/* Header */}
           <div>
             <p className="text-xs font-mono font-bold tracking-widest text-text-muted">DOCUMENTATION</p>
             <h1 className="mt-1 text-3xl font-bold tracking-tight">Help & Guides</h1>
             <p className="mt-1 text-sm text-text-secondary">Step-by-step walkthroughs to get the most out of DocuMind.</p>
+          </div>
+
+          {/* Contact / GitHub — MOVED TO TOP */}
+          <div className="glass rounded-2xl p-5 space-y-3">
+            <p className="text-xs font-bold tracking-widest text-text-muted">DEVELOPER & CONTACT</p>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <a href="https://github.com/ShaikMuzzammil" target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-3 rounded-xl border border-border bg-bg-card/60 px-4 py-3 hover:border-accent/30 hover:bg-accent/5 transition-all group"
+              >
+                <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
+                  <Github className="h-4 w-4 text-accent" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">GitHub</p>
+                  <p className="text-xs text-text-muted">ShaikMuzzammil</p>
+                </div>
+                <ExternalLink className="h-3.5 w-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+              </a>
+              <a href="https://shaikmuzzammil.vercel.app" target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-3 rounded-xl border border-border bg-bg-card/60 px-4 py-3 hover:border-accent/30 hover:bg-accent/5 transition-all group"
+              >
+                <div className="w-9 h-9 rounded-xl bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center">
+                  <User className="h-4 w-4 text-cyan-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Portfolio</p>
+                  <p className="text-xs text-text-muted">shaikmuzzammil.vercel.app</p>
+                </div>
+                <ExternalLink className="h-3.5 w-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+              </a>
+              <a href="https://github.com/ShaikMuzzammil/documind/issues/new" target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-3 rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 hover:border-danger/40 hover:bg-danger/10 transition-all group"
+              >
+                <div className="w-9 h-9 rounded-xl bg-danger/10 border border-danger/20 flex items-center justify-center">
+                  <Bug className="h-4 w-4 text-danger" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Report Bug</p>
+                  <p className="text-xs text-text-muted">Open a GitHub issue</p>
+                </div>
+                <ExternalLink className="h-3.5 w-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+              </a>
+            </div>
           </div>
 
           {/* Quick nav */}
@@ -198,7 +248,7 @@ export default function HelpPage() {
             {[
               { label: 'Getting Started', icon: BookOpen, href: '#guides' },
               { label: 'AI Configuration', icon: Key, href: '#ai' },
-              { label: 'Troubleshooting', icon: Zap, href: '#troubleshooting' },
+              { label: 'Troubleshooting', icon: AlertTriangle, href: '#troubleshooting' },
               { label: 'Privacy', icon: Shield, href: '#privacy' },
             ].map(({ label, icon: Icon, href }) => (
               <a key={label} href={href}
@@ -215,7 +265,7 @@ export default function HelpPage() {
               <BookOpen className="h-5 w-5 text-accent" /> Step-by-step guides
             </h2>
             <div className="space-y-3">
-              {GUIDES.map((guide, i) => <GuideCard key={guide.title} guide={guide} index={i} />)}
+              {GUIDES.map((guide) => <GuideCard key={guide.title} guide={guide} />)}
             </div>
           </section>
 
@@ -256,13 +306,14 @@ export default function HelpPage() {
             </div>
           </section>
 
+          {/* Footer link */}
           <div className="glass rounded-xl p-4 flex items-center gap-3 text-sm">
-            <ExternalLink className="h-4 w-4 text-accent shrink-0" />
-            <span className="text-text-secondary">Found a bug or want to contribute?</span>
-            <a href="https://github.com/ShaikMuzzammil/documind" target="_blank" rel="noopener noreferrer"
+            <Mail className="h-4 w-4 text-accent shrink-0" />
+            <span className="text-text-secondary">Questions or collaboration?</span>
+            <a href="https://shaikmuzzammil.vercel.app" target="_blank" rel="noopener noreferrer"
               className="ml-auto text-accent hover:underline font-medium shrink-0"
             >
-              GitHub →
+              Visit Portfolio →
             </a>
           </div>
         </div>

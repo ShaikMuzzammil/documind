@@ -15,6 +15,16 @@ const nextConfig = {
       },
     ];
   },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Prevent webpack from bundling pdf-parse — let Node.js require() handle it
+      config.externals = config.externals || [];
+      if (Array.isArray(config.externals)) {
+        config.externals.push('pdf-parse');
+      }
+    }
+    return config;
+  },
 };
 
 module.exports = nextConfig;

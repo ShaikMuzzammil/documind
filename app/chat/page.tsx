@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send, Sparkles, Loader2, Trash2, Download, ArrowDown,
   AlertTriangle, Settings, BookOpen, Zap, FileText, Clock,
+  Upload, FolderPlus, MessageSquare, ChevronRight, RotateCcw,
 } from 'lucide-react';
 import { ChatMessage, Citation } from '@/lib/types';
 import { generateId } from '@/lib/utils';
@@ -24,6 +25,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [docCount, setDocCount] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -34,9 +36,14 @@ export default function ChatPage() {
     const params = new URLSearchParams(window.location.search);
     const initialCollectionId = params.get('collectionId');
     if (initialCollectionId) setCollectionId(initialCollectionId);
+    const q = params.get('q');
+    if (q) setInput(q);
+    // Fetch document count to show proper empty state
+    fetch('/api/documents').then(r => r.json()).then(d => {
+      setDocCount((d.documents || []).filter((doc: { status: string }) => doc.status === 'ready').length);
+    }).catch(() => setDocCount(0));
   }, []);
 
-  // Scroll button visibility
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -82,8 +89,8 @@ export default function ChatPage() {
     a.click();
   };
 
-  const send = async () => {
-    const question = input.trim();
+  const send = async (overrideQuestion?: string) => {
+    const question = (overrideQuestion || input).trim();
     if (!question || busy) return;
 
     const userMsg: ChatMessage = {
@@ -158,6 +165,9 @@ export default function ChatPage() {
     }
   };
 
+  const hasDocuments = docCount !== null && docCount > 0;
+  const hasCollections = collections.length > 0;
+
   return (
     <AuthGate>
       <div className="flex flex-col h-screen">
@@ -192,14 +202,14 @@ export default function ChatPage() {
                   title="Clear conversation"
                   className="h-8 w-8 flex items-center justify-center rounded-lg border border-border bg-bg-card text-text-muted hover:text-danger hover:border-danger/30 transition-colors"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <RotateCcw className="h-3.5 w-3.5" />
                 </button>
               </>
             )}
           </div>
         </div>
 
-        {/* AI not configured banner */}
+        {/* Status banners */}
         <AnimatePresence>
           {!busy && aiConfigured === false && (
             <motion.div
@@ -231,34 +241,77 @@ export default function ChatPage() {
           )}
         </AnimatePresence>
 
-        {/* Messages */}
+        {/* Messages area */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 relative">
           <div className="max-w-3xl mx-auto space-y-5">
-            {messages.length === 0 && (
-              <div className="text-center py-12">
-                <div className="w-14 h-14 rounded-2xl bg-accent-soft border border-accent/20 flex items-center justify-center mx-auto mb-4">
-                  <Sparkles className="w-6 h-6 text-accent" />
-                </div>
-                <h2 className="text-lg font-semibold mb-2">Ask anything about your documents</h2>
 
-                {collections.length === 0 ? (
-                  <p className="text-sm text-text-muted max-w-sm mx-auto">
-                    You need at least one collection with documents before chatting.{' '}
-                    <Link href="/collections" className="text-accent hover:underline">Create a collection</Link>{' '}
-                    then{' '}
-                    <Link href="/documents" className="text-accent hover:underline">upload documents</Link>.
-                  </p>
+            {/* Enhanced empty state */}
+            {messages.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="text-center py-8"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-accent/10">
+                  <Sparkles className="w-7 h-7 text-accent" />
+                </div>
+                <h2 className="text-xl font-bold mb-2">Ask DocuMind anything</h2>
+                <p className="text-sm text-text-muted max-w-sm mx-auto mb-8">
+                  Get grounded, cited answers from your own documents.
+                </p>
+
+                {/* Setup prompts if no collections/docs */}
+                {!hasCollections ? (
+                  <div className="glass rounded-2xl p-6 max-w-lg mx-auto space-y-3">
+                    <p className="text-sm font-semibold text-text-secondary mb-4">Get started in 3 steps</p>
+                    <Link href="/collections" className="flex items-center gap-3 rounded-xl border border-border bg-bg-card/60 px-4 py-3 text-left hover:border-accent/30 hover:bg-accent/5 transition-all group">
+                      <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+                        <FolderPlus className="h-4 w-4 text-accent" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">1. Create a collection</p>
+                        <p className="text-xs text-text-muted">Organize documents by project or topic</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-text-muted group-hover:text-accent transition-colors" />
+                    </Link>
+                    <Link href="/documents" className="flex items-center gap-3 rounded-xl border border-border bg-bg-card/60 px-4 py-3 text-left hover:border-accent/30 hover:bg-accent/5 transition-all group">
+                      <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+                        <Upload className="h-4 w-4 text-accent" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">2. Upload documents</p>
+                        <p className="text-xs text-text-muted">PDF, TXT, MD, CSV, JSON, code files</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-text-muted group-hover:text-accent transition-colors" />
+                    </Link>
+                    <div className="flex items-center gap-3 rounded-xl border border-accent/20 bg-accent/5 px-4 py-3">
+                      <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center shrink-0">
+                        <MessageSquare className="h-4 w-4 text-accent" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">3. Ask questions here</p>
+                        <p className="text-xs text-text-muted">Get cited answers from your documents</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : !hasDocuments ? (
+                  <div className="glass rounded-2xl p-6 max-w-md mx-auto text-center">
+                    <Upload className="h-10 w-10 text-text-muted mx-auto mb-3 opacity-40" />
+                    <p className="font-semibold mb-2">No indexed documents yet</p>
+                    <p className="text-sm text-text-muted mb-4">Upload documents to start asking questions with cited answers.</p>
+                    <Link href="/documents" className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity">
+                      <Upload className="h-4 w-4" /> Upload documents
+                    </Link>
+                  </div>
                 ) : (
                   <>
-                    <p className="text-sm text-text-muted max-w-sm mx-auto mb-6">
-                      Select a collection above or search across{' '}
-                      <span className="text-text-primary">all collections</span>. Answers include inline citations.
-                    </p>
+                    <p className="text-xs text-text-muted mb-4 font-medium tracking-wide">SUGGESTED QUESTIONS</p>
                     <div className="mx-auto grid max-w-2xl gap-2 sm:grid-cols-2">
                       {quickPrompts.map(({ icon: Icon, text }) => (
                         <button
                           key={text}
-                          onClick={() => { setInput(text); inputRef.current?.focus(); }}
+                          onClick={() => { setInput(text); send(text); }}
                           className="rounded-xl border border-border bg-bg-card/60 px-4 py-3 text-left text-xs text-text-secondary transition-all hover:border-accent/30 hover:text-text-primary hover:bg-accent/5 flex items-start gap-2.5 group"
                         >
                           <Icon className="h-3.5 w-3.5 text-accent mt-0.5 shrink-0" />
@@ -266,11 +319,17 @@ export default function ChatPage() {
                         </button>
                       ))}
                     </div>
+                    {collections.length > 0 && (
+                      <p className="text-xs text-text-muted mt-6">
+                        {docCount} document{docCount !== 1 ? 's' : ''} indexed · Select a collection above to focus answers
+                      </p>
+                    )}
                   </>
                 )}
-              </div>
+              </motion.div>
             )}
 
+            {/* Messages */}
             {messages.map((msg) => (
               <motion.div
                 key={msg.id}
@@ -350,7 +409,7 @@ export default function ChatPage() {
               />
             </div>
             <button
-              onClick={send}
+              onClick={() => send()}
               disabled={busy || !input.trim()}
               className="shrink-0 w-11 h-11 rounded-xl bg-accent text-white flex items-center justify-center hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
             >

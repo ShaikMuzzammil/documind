@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, LineChart, Line,
@@ -8,6 +9,7 @@ import {
 import {
   AlertCircle, BarChart3, CheckCircle2, FileText, FolderOpen,
   Layers, RefreshCw, TrendingUp, Zap, Database, Mail, Activity,
+  MessageSquare, Search, Download, Settings, ChevronRight, Upload,
 } from 'lucide-react';
 import AuthGate from '@/components/app/AuthGate';
 import { WorkspaceStats } from '@/lib/analytics';
@@ -70,7 +72,6 @@ export default function AnalyticsPage() {
     return () => clearInterval(interval);
   }, [autoRefresh, load]);
 
-  // Build activity data from recentDocuments
   const activityData = stats?.recentDocuments
     ? (() => {
         const byDay: Record<string, number> = {};
@@ -81,6 +82,15 @@ export default function AnalyticsPage() {
         return Object.entries(byDay).slice(-7).map(([day, count]) => ({ day, count }));
       })()
     : [];
+
+  const quickLinks = [
+    { href: '/documents', icon: Upload, label: 'Add Documents', desc: 'Upload and index new files' },
+    { href: '/collections', icon: FolderOpen, label: 'Collections', desc: 'Manage document groups' },
+    { href: '/chat', icon: MessageSquare, label: 'Chat', desc: 'Ask questions about your docs' },
+    { href: '/search', icon: Search, label: 'Search', desc: 'Find specific passages' },
+    { href: '/export', icon: Download, label: 'Export', desc: 'Download workspace data' },
+    { href: '/settings', icon: Settings, label: 'Settings', desc: 'Configure your workspace' },
+  ];
 
   return (
     <AuthGate>
@@ -124,21 +134,22 @@ export default function AnalyticsPage() {
               {/* KPI cards */}
               <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
-                  { Icon: FileText,   label: 'Documents',   value: stats.totals.documents,     sub: stats.totals.readyDocuments + ' ready',  color: 'text-accent' },
-                  { Icon: FolderOpen, label: 'Collections', value: stats.totals.collections,    sub: 'active workspaces',                       color: 'text-cyan-400' },
-                  { Icon: Layers,     label: 'Chunks',      value: stats.totals.chunks,          sub: 'semantic segments',                       color: 'text-emerald-400' },
-                  { Icon: TrendingUp, label: 'Storage',     value: fmt(stats.totals.bytes),      sub: 'indexed content',                         color: 'text-orange-400' },
-                ].map(({ Icon, label, value, sub, color }) => (
-                  <div key={label} className="glass rounded-xl p-5">
+                  { Icon: FileText,   label: 'Documents',   value: stats.totals.documents,     sub: stats.totals.readyDocuments + ' ready',  color: 'text-accent',         href: '/documents' },
+                  { Icon: FolderOpen, label: 'Collections', value: stats.totals.collections,    sub: 'active workspaces',                       color: 'text-cyan-400',       href: '/collections' },
+                  { Icon: Layers,     label: 'Chunks',      value: stats.totals.chunks,          sub: 'semantic segments',                       color: 'text-emerald-400',    href: '/search' },
+                  { Icon: TrendingUp, label: 'Storage',     value: fmt(stats.totals.bytes),      sub: 'indexed content',                         color: 'text-orange-400',     href: '/export' },
+                ].map(({ Icon, label, value, sub, color, href }) => (
+                  <Link key={label} href={href} className="glass rounded-xl p-5 hover:border-accent/30 transition-all group">
                     <div className="flex items-center gap-2 mb-3">
                       <div className="w-8 h-8 rounded-lg bg-bg-card border border-border/60 flex items-center justify-center">
                         <Icon className={`h-4 w-4 ${color}`} />
                       </div>
                       <span className="text-xs text-text-muted">{label}</span>
+                      <ChevronRight className="h-3 w-3 text-text-muted ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                     <p className="text-2xl font-bold">{value}</p>
                     <p className="text-xs text-text-muted mt-0.5">{sub}</p>
-                  </div>
+                  </Link>
                 ))}
               </section>
 
@@ -146,22 +157,23 @@ export default function AnalyticsPage() {
               {caps && (
                 <section className="grid gap-4 sm:grid-cols-3">
                   {[
-                    { Icon: Zap,      label: 'Answer Engine',   ok: caps.aiAnswers, okText: 'AI answers enabled', failText: 'Add LLM_API_KEY to Settings' },
-                    { Icon: Database, label: 'Vector Database',  ok: caps.database === 'postgres', okText: 'PostgreSQL + pgvector', failText: 'Using local JSON (add DATABASE_URL)' },
-                    { Icon: Mail,     label: 'Email Service',    ok: caps.email,    okText: 'Resend configured', failText: 'Optional — add RESEND_API_KEY' },
-                  ].map(({ Icon, label, ok, okText, failText }) => (
-                    <div key={label} className={`glass rounded-xl p-4 flex items-start gap-3 border ${ok ? 'border-success/20 bg-success/5' : 'border-yellow-500/20 bg-yellow-500/5'}`}>
+                    { Icon: Zap,      label: 'Answer Engine',   ok: caps.aiAnswers, okText: 'AI answers enabled', failText: 'Add LLM_API_KEY — see README', href: '/settings' },
+                    { Icon: Database, label: 'Vector Database',  ok: caps.database === 'postgres', okText: 'PostgreSQL + pgvector', failText: 'Using local JSON (add DATABASE_URL)', href: '/settings' },
+                    { Icon: Mail,     label: 'Email Service',    ok: caps.email,    okText: 'Resend configured', failText: 'Optional — add RESEND_API_KEY', href: '/settings' },
+                  ].map(({ Icon, label, ok, okText, failText, href }) => (
+                    <Link key={label} href={href} className={`glass rounded-xl p-4 flex items-start gap-3 border hover:border-accent/30 transition-all group ${ok ? 'border-success/20 bg-success/5' : 'border-yellow-500/20 bg-yellow-500/5'}`}>
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${ok ? 'bg-success/15' : 'bg-yellow-500/15'}`}>
                         <Icon className={`h-4 w-4 ${ok ? 'text-success' : 'text-yellow-400'}`} />
                       </div>
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 mb-0.5">
                           {ok ? <CheckCircle2 className="h-3.5 w-3.5 text-success" /> : <AlertCircle className="h-3.5 w-3.5 text-yellow-400" />}
                           <p className="text-sm font-semibold">{label}</p>
+                          <ChevronRight className="h-3 w-3 text-text-muted ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                         <p className={`text-xs ${ok ? 'text-success' : 'text-yellow-400'}`}>{ok ? okText : failText}</p>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </section>
               )}
@@ -169,11 +181,19 @@ export default function AnalyticsPage() {
               <section className="grid gap-6 lg:grid-cols-2">
                 {/* Documents per collection */}
                 <div className="glass rounded-xl p-5">
-                  <h2 className="font-semibold mb-4 flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4 text-accent" /> Documents per collection
-                  </h2>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-semibold flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-accent" /> Documents per collection
+                    </h2>
+                    <Link href="/collections" className="text-xs text-accent hover:underline">View all →</Link>
+                  </div>
                   {stats.collections.length === 0 ? (
-                    <p className="text-sm text-text-muted py-8 text-center">No collections yet</p>
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-text-muted">No collections yet</p>
+                      <Link href="/collections" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent/10 px-3 py-1.5 text-xs text-accent hover:bg-accent/20 transition-colors">
+                        <FolderOpen className="h-3.5 w-3.5" /> Create collection
+                      </Link>
+                    </div>
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <BarChart data={stats.collections} margin={{ left: -20 }}>
@@ -190,9 +210,17 @@ export default function AnalyticsPage() {
 
                 {/* File type breakdown */}
                 <div className="glass rounded-xl p-5">
-                  <h2 className="font-semibold mb-4">File type breakdown</h2>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-semibold">File type breakdown</h2>
+                    <Link href="/documents" className="text-xs text-accent hover:underline">Manage docs →</Link>
+                  </div>
                   {stats.fileTypes.length === 0 ? (
-                    <p className="text-sm text-text-muted py-8 text-center">No documents yet</p>
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-text-muted">No documents yet</p>
+                      <Link href="/documents" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent/10 px-3 py-1.5 text-xs text-accent hover:bg-accent/20 transition-colors">
+                        <Upload className="h-3.5 w-3.5" /> Upload documents
+                      </Link>
+                    </div>
                   ) : (
                     <div className="flex flex-col sm:flex-row items-center gap-6">
                       <ResponsiveContainer width={160} height={160}>
@@ -243,7 +271,7 @@ export default function AnalyticsPage() {
                 <section className="glass rounded-xl overflow-hidden">
                   <div className="border-b border-border px-5 py-4 flex items-center justify-between">
                     <h2 className="font-semibold">Recent documents</h2>
-                    <span className="text-xs text-text-muted">{stats.recentDocuments.length} shown</span>
+                    <Link href="/documents" className="text-xs text-accent hover:underline">View all →</Link>
                   </div>
                   <div className="divide-y divide-border/60">
                     {stats.recentDocuments.map((doc) => (
@@ -263,6 +291,22 @@ export default function AnalyticsPage() {
               )}
             </>
           ) : null}
+
+          {/* Quick navigation links at bottom */}
+          <div className="glass rounded-2xl p-5">
+            <p className="text-xs font-bold tracking-widest text-text-muted mb-4">NAVIGATE TO</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {quickLinks.map(({ href, icon: Icon, label, desc }) => (
+                <Link key={href} href={href} className="flex flex-col items-center gap-2 rounded-xl border border-border bg-bg-card/60 p-3 text-center hover:border-accent/30 hover:bg-accent/5 transition-all group">
+                  <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
+                    <Icon className="h-4 w-4 text-accent" />
+                  </div>
+                  <p className="text-xs font-semibold">{label}</p>
+                  <p className="text-[10px] text-text-muted leading-tight">{desc}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </AuthGate>
