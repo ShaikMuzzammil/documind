@@ -1,30 +1,24 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Keep these packages out of the serverless bundle — Node.js require() will handle them
+
+  // Next.js 16 uses Turbopack by default.
+  // serverExternalPackages is the Turbopack-compatible way to keep
+  // native Node.js packages (pdf-parse, bcryptjs, pg) out of the bundle.
   serverExternalPackages: ['pdf-parse', 'bcryptjs', 'pg'],
+
+  // Empty turbopack config silences the "webpack config present but no turbopack config" error
+  turbopack: {},
 
   async headers() {
     return [{
       source: '/:path*',
       headers: [
-        { key: 'X-Frame-Options',       value: 'DENY' },
-        { key: 'X-Content-Type-Options', value: 'nosniff' },
-        { key: 'Referrer-Policy',        value: 'strict-origin-when-cross-origin' },
+        { key: 'X-Frame-Options',        value: 'DENY' },
+        { key: 'X-Content-Type-Options',  value: 'nosniff' },
+        { key: 'Referrer-Policy',         value: 'strict-origin-when-cross-origin' },
       ],
     }];
-  },
-
-  webpack(config, { isServer }) {
-    if (isServer) {
-      // Prevent webpack from trying to bundle pdf-parse — it uses require() internally
-      if (Array.isArray(config.externals)) {
-        config.externals.push('pdf-parse');
-      } else if (typeof config.externals === 'object') {
-        config.externals['pdf-parse'] = 'commonjs pdf-parse';
-      }
-    }
-    return config;
   },
 };
 
