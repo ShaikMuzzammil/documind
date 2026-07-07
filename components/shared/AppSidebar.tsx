@@ -68,7 +68,7 @@ export default function AppSidebar() {
           <span className="font-bold text-sm tracking-tight">
             Docu<span className="gradient-text">Mind</span>
           </span>
-          <span className="ml-auto text-[9px] font-mono text-text-muted bg-bg-card border border-border rounded px-1.5 py-0.5">v5</span>
+          <span className="ml-auto text-[9px] font-mono text-text-muted bg-bg-card border border-border rounded px-1.5 py-0.5">v5.2</span>
         </div>
 
         <div className="flex-1 overflow-y-auto py-3 flex flex-col">

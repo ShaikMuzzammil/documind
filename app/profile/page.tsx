@@ -7,7 +7,7 @@ import {
   AlertCircle, Calendar, CheckCircle2, Edit2, FolderOpen,
   Layers, Save, User, X, FileText, Activity, Award,
   Upload, MessageSquare, Search, Download, ExternalLink,
-  RefreshCw, Github, Globe,
+  RefreshCw, Globe,
 } from 'lucide-react';
 import AuthGate from '@/components/app/AuthGate';
 import { WorkspaceStats } from '@/lib/analytics';
@@ -210,23 +210,26 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              {/* External links */}
+              {/* Account info card */}
               <div className="glass rounded-xl p-4 space-y-2">
-                <p className="text-xs font-bold tracking-widest text-text-muted mb-3">LINKS</p>
-                <a href="https://github.com/ShaikMuzzammil" target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-text-secondary hover:text-accent hover:bg-accent/5 transition-colors group"
+                <p className="text-xs font-bold tracking-widest text-text-muted mb-3">ACCOUNT INFO</p>
+                <div className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-text-secondary">
+                  <User className="h-3.5 w-3.5 text-accent shrink-0" />
+                  <span className="truncate">{typedUser?.name || 'No display name'}</span>
+                </div>
+                <div className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-text-secondary">
+                  <Globe className="h-3.5 w-3.5 text-accent shrink-0" />
+                  <span className="truncate">{typedUser?.email || '—'}</span>
+                </div>
+                <div className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-text-secondary">
+                  <Calendar className="h-3.5 w-3.5 text-accent shrink-0" />
+                  <span>Member since {typedUser?.createdAt ? new Date(typedUser.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '—'}</span>
+                </div>
+                <Link href="/settings"
+                  className="flex items-center gap-2 mt-2 rounded-lg border border-border bg-bg-card/50 px-3 py-2 text-xs text-text-muted hover:text-accent hover:border-accent/30 transition-colors"
                 >
-                  <Github className="h-3.5 w-3.5" />
-                  GitHub Profile
-                  <ExternalLink className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
-                </a>
-                <a href="https://shaikmuzzammil.vercel.app" target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-text-secondary hover:text-accent hover:bg-accent/5 transition-colors group"
-                >
-                  <Globe className="h-3.5 w-3.5" />
-                  Portfolio
-                  <ExternalLink className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
-                </a>
+                  <Edit2 className="h-3 w-3" /> Edit profile in Settings
+                </Link>
               </div>
 
               {/* Achievements */}

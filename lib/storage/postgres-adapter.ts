@@ -36,8 +36,14 @@ function friendlyDbError(err: unknown): Error {
         'Re-upload your documents after changing the embedding model, or contact your administrator.',
     );
   }
+  if (/type "vector" does not exist|could not open extension/i.test(message)) {
+    return new Error(
+      'The pgvector extension is not enabled on this database. ' +
+        'Enable it from your Neon or Supabase dashboard under Database → Extensions, then retry.',
+    );
+  }
   if (/password authentication failed|ENOTFOUND|ECONNREFUSED|self-signed certificate/i.test(message)) {
-    return new Error('Could not connect to the database. Double-check the database connection settings.');
+    return new Error('Could not connect to the database. Double-check DATABASE_URL in Settings → AI Engine.');
   }
   return new Error('A database error occurred. Please try again.');
 }
@@ -48,7 +54,13 @@ export class PostgresAdapter implements StorageAdapter {
   async init(): Promise<void> {
     if (this.ready) return;
     const db = getPool();
-    await db.query('CREATE EXTENSION IF NOT EXISTS vector');
+
+    // Attempt to create pgvector extension. On Neon and Supabase free tiers,
+    // the user may lack superuser rights — they need to enable it from the
+    // dashboard. We try, ignore permission errors, and let the chunks table
+    // creation below surface a clear message if the type still doesn't exist.
+    await db.query('CREATE EXTENSION IF NOT EXISTS vector').catch(() => undefined);
+
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,

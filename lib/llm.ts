@@ -21,13 +21,21 @@ export function buildMessages(question: string, citations: Citation[]) {
     .map((c, i) => `[${i + 1}] (from "${c.documentName}")\n${c.text}`)
     .join('\n\n');
 
-  const system = [
-    'You are the DocuMind retrieval assistant.',
-    'Answer ONLY using the provided context passages.',
-    'Cite sources inline using bracketed numbers like [1], [2] that map to the passages.',
-    "If the answer is not in the context, say you could not find it in the user's documents.",
-    'Be concise, accurate, and never invent facts.',
-  ].join(' ');
+  const system = citations.length > 0
+    ? [
+        'You are DocuMind, an intelligent document assistant.',
+        'Answer using ONLY the provided context passages — never invent facts outside them.',
+        'Cite sources inline using bracketed numbers like [1], [2] that correspond to the passages.',
+        'If the specific answer is not in the context, say clearly: "I could not find this in the provided documents."',
+        'Be concise, accurate, and well-structured. Use markdown for lists and headings when it helps clarity.',
+      ].join(' ')
+    : [
+        'You are DocuMind, an intelligent document assistant.',
+        'No relevant passages were found for this question in the indexed documents.',
+        'Politely let the user know their documents do not contain an answer to this question.',
+        'Suggest they upload relevant documents, or rephrase their question.',
+        'Never make up document content. Be brief and helpful.',
+      ].join(' ');
 
   const user = context
     ? `Context passages:\n\n${context}\n\nQuestion: ${question}`
@@ -63,8 +71,10 @@ export async function streamChat(
       start(controller) {
         controller.enqueue(
           encoder.encode(
-            'AI answers are not turned on for this workspace yet. Open Settings to learn how to enable them - ' +
-              'retrieval and citations below still work without it.',
+            '**AI answers are not configured yet.**\n\n' +
+            'To enable answers, add your `LLM_API_KEY` environment variable (Gemini, OpenAI, or any OpenAI-compatible provider).\n\n' +
+            'See the **README** or go to **Settings → AI Engine** for setup instructions.\n\n' +
+            '_Tip: Document upload and semantic search still work without an AI key._',
           ),
         );
         controller.close();

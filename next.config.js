@@ -5,7 +5,8 @@ const nextConfig = {
   // Next.js 16 uses Turbopack by default.
   // serverExternalPackages is the Turbopack-compatible way to keep
   // native Node.js packages (pdf-parse, bcryptjs, pg) out of the bundle.
-  serverExternalPackages: ['pdf-parse', 'bcryptjs', 'pg'],
+  // We list both the package root AND the lib sub-path we require() directly.
+  serverExternalPackages: ['pdf-parse', 'pdf-parse/lib/pdf-parse.js', 'bcryptjs', 'pg'],
 
   // Empty turbopack config silences the "webpack config present but no turbopack config" error
   turbopack: {},

@@ -375,6 +375,13 @@ export default function ChatPage() {
         <div className="border-t border-border px-4 sm:px-6 py-3 pb-20 lg:pb-3 bg-bg-secondary/20 shrink-0">
           <div className="max-w-3xl mx-auto">
             <div className="flex items-end gap-2">
+              {/* Upload shortcut */}
+              <Link href="/documents" title="Upload documents"
+                className="shrink-0 w-11 h-11 rounded-xl border border-border bg-bg-card text-text-muted flex items-center justify-center hover:text-accent hover:border-accent/40 hover:bg-accent/5 transition-all"
+              >
+                <Upload className="w-4 h-4" />
+              </Link>
+
               <div className="flex-1 relative">
                 <textarea
                   ref={inputRef}
@@ -382,7 +389,7 @@ export default function ChatPage() {
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                   rows={1}
-                  placeholder="Ask a question about your documents… (Enter to send)"
+                  placeholder="Ask anything about your documents… (Enter to send)"
                   className="w-full resize-none bg-bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-accent/40 transition-colors max-h-36"
                   style={{ minHeight: 48 }}
                   onInput={e => {
@@ -399,7 +406,7 @@ export default function ChatPage() {
               </button>
             </div>
             <p className="text-center text-[10px] text-text-muted mt-2">
-              DocuMind retrieves passages from your documents and generates grounded answers with citations.
+              DocuMind searches your indexed documents and generates cited answers · <Link href="/documents" className="hover:text-accent transition-colors underline underline-offset-2">Add documents</Link>
             </p>
           </div>
         </div>

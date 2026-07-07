@@ -26,11 +26,14 @@ class IngestError extends Error {
 }
 
 async function parsePdf(buffer: Buffer): Promise<string> {
-  // pdf-parse v1 — works in Node.js without browser APIs (no DOMMatrix required)
+  // Load pdf-parse directly from its lib file to bypass the index.js test-runner
+  // that tries to load non-existent test PDFs in serverless environments.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
-  const data = await pdfParse(buffer);
-  return (data.text || '').trim();
+  const pdfParse = require('pdf-parse/lib/pdf-parse.js') as (buf: Buffer, opts?: object) => Promise<{ text: string; numpages: number }>;
+  const data = await pdfParse(buffer, { max: 0 });
+  const text = (data.text || '').trim();
+  if (!text) throw new Error('No text layer found — file may be a scanned image PDF. Run OCR first.');
+  return text;
 }
 
 async function extractText(file: File): Promise<string> {
