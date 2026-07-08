@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireCurrentUser } from '@/lib/auth';
-import { deleteCollection, updateCollection } from '@/lib/store';
+import { getChatMessages, deleteChatSession, updateChatSession } from '@/lib/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireCurrentUser(req).catch(() => null);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { id } = await params;
+  try {
+    const messages = await getChatMessages(user.id, id);
+    return NextResponse.json({ messages });
+  } catch {
+    return NextResponse.json({ messages: [] });
+  }
+}
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireCurrentUser(req).catch(() => null);
@@ -11,14 +23,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   try {
-    const updated = await updateCollection(user.id, id, {
-      name: body.name,
-      description: body.description,
-    });
-    if (!updated) return NextResponse.json({ error: 'Collection not found' }, { status: 404 });
-    return NextResponse.json({ collection: updated });
+    await updateChatSession(user.id, id, { title: body.title });
+    return NextResponse.json({ ok: true });
   } catch {
-    return NextResponse.json({ error: 'Update failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
   }
 }
 
@@ -27,9 +35,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { id } = await params;
   try {
-    await deleteCollection(user.id, id);
+    await deleteChatSession(user.id, id);
     return NextResponse.json({ ok: true });
   } catch {
-    return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to delete' }, { status: 500 });
   }
 }

@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  AlertCircle, CheckCircle2, FileText, FolderPlus, Loader2,
-  RefreshCw, Search, Trash2, UploadCloud, X, ChevronDown,
-  File, FileCode, Database, Hash, Eye, MessageSquare, Plus,
-  Filter, ArrowUpDown, ChevronUp,
+  AlertCircle, CheckCircle2, FileText, Loader2, RefreshCw,
+  Search, Trash2, UploadCloud, X, File, FileCode, Database,
+  Eye, MessageSquare, Plus, Filter, ArrowUpDown,
+  ChevronDown, ChevronUp, Hash, FolderOpen, Layers, Zap,
+  Clock, Download,
 } from 'lucide-react';
 import CollectionPicker from '@/components/app/CollectionPicker';
 import AuthGate from '@/components/app/AuthGate';
@@ -20,20 +21,18 @@ type SortDir = 'asc' | 'desc';
 
 function statusClass(status: DocumentMeta['status']) {
   if (status === 'ready') return 'text-success bg-success/10 border-success/20';
-  if (status === 'processing') return 'text-accent-2 bg-accent-2/10 border-accent-2/20';
+  if (status === 'processing') return 'text-accent bg-accent/10 border-accent/20';
   return 'text-danger bg-danger/10 border-danger/20';
 }
 
-function getFileExt(type: string, name: string): string {
+function getFileExt(type: string, name: string) {
   if (name.toLowerCase().endsWith('.pdf')) return 'PDF';
-  const nameExt = name.split('.').pop()?.toLowerCase() || '';
-  if (nameExt) return nameExt.toUpperCase();
-  return type.split('/').pop()?.toUpperCase() || 'FILE';
+  return name.split('.').pop()?.toUpperCase() || type.split('/').pop()?.toUpperCase() || 'FILE';
 }
 
 function FileTypeIcon({ type, name }: { type: string; name: string }) {
   const ext = getFileExt(type, name).toLowerCase();
-  if (ext === 'pdf') return <div className="text-red-400 font-bold text-[10px] bg-red-400/10 rounded px-1 py-0.5">PDF</div>;
+  if (ext === 'pdf') return <span className="text-red-400 font-bold text-[9px] bg-red-400/10 rounded px-1 py-0.5">PDF</span>;
   if (['md', 'txt'].includes(ext)) return <File className="h-3.5 w-3.5 text-blue-400" />;
   if (['csv', 'json'].includes(ext)) return <Database className="h-3.5 w-3.5 text-green-400" />;
   if (['js', 'ts', 'tsx', 'jsx', 'py', 'rs', 'go', 'java', 'c', 'cpp'].includes(ext)) return <FileCode className="h-3.5 w-3.5 text-purple-400" />;
@@ -41,536 +40,552 @@ function FileTypeIcon({ type, name }: { type: string; name: string }) {
 }
 
 function collectionName(collections: Collection[], id: string) {
-  return collections.find((c) => c.id === id)?.name || 'Unknown';
+  return collections.find(c => c.id === id)?.name || 'Unknown';
 }
 
-// Document detail modal
-function DocumentModal({ doc, onClose }: { doc: DocumentMeta; onClose: () => void }) {
+// ── Preview modal ──────────────────────────────────────────────────────────────
+function PreviewModal({ doc, onClose }: { doc: DocumentMeta; onClose: () => void }) {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<{ chunkCount: number; chunks: { index: number; text: string }[] } | null>(null);
+  const [activeChunk, setActiveChunk] = useState(0);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch(`/api/documents/${doc.id}/preview`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { setError(d.error); } else { setData(d); }
+      })
+      .catch(() => setError('Could not load preview'))
+      .finally(() => setLoading(false));
+  }, [doc.id]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative glass rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-accent" />
-            </div>
-            <div>
-              <h2 className="font-bold text-base leading-tight">{doc.name}</h2>
-              <p className="text-xs text-text-muted mt-0.5">{getFileExt(doc.type, doc.name)} · {formatBytes(doc.size)}</p>
-            </div>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative glass rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 border border-accent/20">
+            <FileText className="h-4 w-4 text-accent" />
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors">
-            <X className="h-4 w-4" />
-          </button>
+          <div className="min-w-0 flex-1">
+            <h2 className="font-bold text-sm truncate">{doc.name}</h2>
+            <p className="text-[11px] text-text-muted">{getFileExt(doc.type, doc.name)} · {formatBytes(doc.size)} · {doc.chunkCount} chunks</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/chat?collectionId=${doc.collectionId}`}
+              className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[11px] font-semibold text-white hover:opacity-90 transition-opacity"
+            >
+              <MessageSquare className="h-3 w-3" /> Ask AI
+            </Link>
+            <button onClick={onClose} className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: 'Status', value: doc.status, isStatus: true },
-            { label: 'Chunks', value: String(doc.chunkCount) },
-            { label: 'Size', value: formatBytes(doc.size) },
-            { label: 'Indexed', value: relativeTime(doc.createdAt) },
-          ].map(({ label, value, isStatus }) => (
-            <div key={label} className="rounded-xl bg-bg-secondary/60 border border-border/50 px-3 py-2.5">
-              <p className="text-xs text-text-muted mb-1">{label}</p>
-              {isStatus ? (
-                <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusClass(doc.status as DocumentMeta['status'])}`}>
-                  {doc.status === 'ready' && <div className="h-1.5 w-1.5 rounded-full bg-success" />}
-                  {doc.status}
-                </span>
-              ) : (
-                <p className="text-sm font-semibold text-text-primary">{value}</p>
-              )}
+        {/* Content */}
+        <div className="flex-1 overflow-hidden flex">
+          {loading ? (
+            <div className="flex flex-1 items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-accent" />
             </div>
-          ))}
-        </div>
-
-        {doc.error && (
-          <div className="rounded-xl border border-danger/25 bg-danger/10 px-4 py-3">
-            <p className="text-xs font-semibold text-danger mb-1">Indexing error</p>
-            <p className="text-xs text-danger/80">{doc.error}</p>
-          </div>
-        )}
-
-        <div className="flex gap-2 pt-2">
-          <Link
-            href={`/chat?collectionId=${doc.collectionId}`}
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
-          >
-            <MessageSquare className="h-4 w-4" /> Chat about this
-          </Link>
-          <Link
-            href={`/search`}
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-bg-card px-4 py-2.5 text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors"
-          >
-            <Search className="h-4 w-4" /> Search docs
-          </Link>
+          ) : error ? (
+            <div className="flex flex-1 items-center justify-center text-center p-8">
+              <div>
+                <AlertCircle className="h-8 w-8 text-danger mx-auto mb-2 opacity-60" />
+                <p className="text-sm text-danger">{error}</p>
+                {doc.status === 'error' && doc.error && (
+                  <p className="text-xs text-text-muted mt-2 max-w-sm">{doc.error}</p>
+                )}
+              </div>
+            </div>
+          ) : data && data.chunks.length > 0 ? (
+            <>
+              {/* Chunk list */}
+              <div className="w-40 shrink-0 border-r border-border bg-bg-secondary/30 overflow-y-auto">
+                <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted border-b border-border">
+                  {data.chunkCount} chunks
+                </p>
+                {data.chunks.map((c, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveChunk(i)}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[11px] transition-colors ${
+                      activeChunk === i ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:bg-bg-hover'
+                    }`}
+                  >
+                    <span className="shrink-0 font-mono">{String(c.index + 1).padStart(2, '0')}</span>
+                    <span className="truncate">{c.text.slice(0, 30)}…</span>
+                  </button>
+                ))}
+                {data.chunkCount > data.chunks.length && (
+                  <p className="px-3 py-2 text-[10px] text-text-muted">+{data.chunkCount - data.chunks.length} more…</p>
+                )}
+              </div>
+              {/* Chunk content */}
+              <div className="flex-1 overflow-y-auto p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                    Chunk {data.chunks[activeChunk].index + 1}
+                  </span>
+                  <div className="flex gap-1">
+                    <button disabled={activeChunk === 0} onClick={() => setActiveChunk(i => i - 1)} className="p-1 rounded text-text-muted hover:text-text-primary disabled:opacity-30 transition-colors"><ChevronUp className="h-3.5 w-3.5" /></button>
+                    <button disabled={activeChunk === data.chunks.length - 1} onClick={() => setActiveChunk(i => i + 1)} className="p-1 rounded text-text-muted hover:text-text-primary disabled:opacity-30 transition-colors"><ChevronDown className="h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
+                <pre className="text-xs leading-relaxed text-text-primary whitespace-pre-wrap font-mono bg-bg-secondary/30 rounded-xl p-4 border border-border">
+                  {data.chunks[activeChunk].text}
+                </pre>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-1 items-center justify-center">
+              <p className="text-sm text-text-muted">No chunks available for preview</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-export default function DocumentsPage() {
-  const { collections, loading: loadingCollections, create: createCollection } = useCollections();
-  const [documents, setDocuments] = useState<DocumentMeta[]>([]);
-  const [collectionId, setCollectionId] = useState('');
-  const [uploadCollectionId, setUploadCollectionId] = useState('');
-  const [newCollectionName, setNewCollectionName] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [query, setQuery] = useState('');
-  const [dragging, setDragging] = useState(false);
-  const [loadingDocs, setLoadingDocs] = useState(true);
+// ── Document row ──────────────────────────────────────────────────────────────
+function DocRow({
+  doc, collections, selected, onSelect, onDelete, onPreview,
+}: {
+  doc: DocumentMeta; collections: Collection[];
+  selected: boolean; onSelect: (id: string, checked: boolean) => void;
+  onDelete: (id: string) => void; onPreview: (doc: DocumentMeta) => void;
+}) {
+  return (
+    <div className={`flex items-center gap-3 px-4 py-3 border-b border-border/50 hover:bg-bg-hover/50 transition-colors group ${selected ? 'bg-accent/5' : ''}`}>
+      <input
+        type="checkbox" checked={selected} onChange={e => onSelect(doc.id, e.target.checked)}
+        className="h-3.5 w-3.5 rounded border-border accent-accent shrink-0"
+      />
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-bg-secondary border border-border">
+        <FileTypeIcon type={doc.type} name={doc.name} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-text-primary">{doc.name}</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+          <span className="text-[11px] text-text-muted">{collectionName(collections, doc.collectionId)}</span>
+          <span className="text-[11px] text-text-muted">{formatBytes(doc.size)}</span>
+          {doc.chunkCount > 0 && <span className="text-[11px] text-text-muted">{doc.chunkCount} chunks</span>}
+          <span className="text-[11px] text-text-muted">{relativeTime(doc.createdAt)}</span>
+        </div>
+        {doc.error && <p className="text-[11px] text-danger mt-0.5 truncate">{doc.error}</p>}
+      </div>
+      <span className={`hidden sm:inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium shrink-0 ${statusClass(doc.status)}`}>
+        {doc.status === 'processing' && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
+        {doc.status === 'ready' && <span className="h-1.5 w-1.5 rounded-full bg-success" />}
+        {doc.status === 'error' && <span className="h-1.5 w-1.5 rounded-full bg-danger" />}
+        {doc.status}
+      </span>
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        {doc.status === 'ready' && (
+          <button onClick={() => onPreview(doc)} title="Preview chunks" className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card transition-colors">
+            <Eye className="h-3.5 w-3.5" />
+          </button>
+        )}
+        <Link href={`/chat?collectionId=${doc.collectionId}`} title="Chat" className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors">
+          <MessageSquare className="h-3.5 w-3.5" />
+        </Link>
+        <button onClick={() => onDelete(doc.id)} title="Delete" className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors">
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Upload zone ───────────────────────────────────────────────────────────────
+function UploadZone({
+  collectionId, collections, onCreate, onNotice,
+}: {
+  collectionId: string; collections: Collection[];
+  onCreate: (doc: DocumentMeta) => void; onNotice: (n: Notice) => void;
+}) {
+  const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [notice, setNotice] = useState<Notice>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [viewDoc, setViewDoc] = useState<DocumentMeta | null>(null);
-  const [sortField, setSortField] = useState<SortField>('createdAt');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'ready' | 'error' | 'processing'>('all');
+  const [progress, setProgress] = useState<Record<string, 'pending' | 'uploading' | 'done' | 'error'>>({});
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [targetCollection, setTargetCollection] = useState(collectionId);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const initialCollectionId = params.get('collectionId');
-    if (initialCollectionId) {
-      setCollectionId(initialCollectionId);
-      setUploadCollectionId(initialCollectionId);
-    }
-  }, []);
+  useEffect(() => { setTargetCollection(collectionId); }, [collectionId]);
 
-  const refreshDocuments = useCallback(async () => {
-    setLoadingDocs(true);
-    try {
-      const params = collectionId ? `?collectionId=${encodeURIComponent(collectionId)}` : '';
-      const res = await fetch(`/api/documents${params}`);
-      const data = await res.json();
-      setDocuments(data.documents || []);
-    } catch {
-      setNotice({ type: 'error', text: 'Unable to load documents.' });
-      setDocuments([]);
-    } finally {
-      setLoadingDocs(false);
-    }
-  }, [collectionId]);
-
-  useEffect(() => {
-    refreshDocuments();
-    const timer = window.setInterval(refreshDocuments, 8000);
-    return () => window.clearInterval(timer);
-  }, [refreshDocuments]);
-
-  useEffect(() => {
-    if (!uploadCollectionId && collections.length) setUploadCollectionId(collections[0].id);
-  }, [collections, uploadCollectionId]);
-
-  const toggleSort = (field: SortField) => {
-    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortField(field); setSortDir('desc'); }
-  };
-
-  const filteredDocuments = useMemo(() => {
-    let docs = [...documents];
-    const needle = query.trim().toLowerCase();
-    if (needle) docs = docs.filter(d => d.name.toLowerCase().includes(needle));
-    if (statusFilter !== 'all') docs = docs.filter(d => d.status === statusFilter);
-    docs.sort((a, b) => {
-      let va: string | number = a[sortField] as string | number;
-      let vb: string | number = b[sortField] as string | number;
-      if (sortField === 'size') { va = a.size; vb = b.size; }
-      if (typeof va === 'string') va = va.toLowerCase();
-      if (typeof vb === 'string') vb = vb.toLowerCase();
-      if (va < vb) return sortDir === 'asc' ? -1 : 1;
-      if (va > vb) return sortDir === 'asc' ? 1 : -1;
-      return 0;
+  const addFiles = (added: FileList | File[]) => {
+    const arr = Array.from(added);
+    setFiles(prev => {
+      const names = new Set(prev.map(f => f.name));
+      return [...prev, ...arr.filter(f => !names.has(f.name))];
     });
-    return docs;
-  }, [documents, query, statusFilter, sortField, sortDir]);
-
-  const stats = useMemo(() => {
-    const ready = documents.filter(d => d.status === 'ready').length;
-    const processing = documents.filter(d => d.status === 'processing').length;
-    const errors = documents.filter(d => d.status === 'error').length;
-    const chunks = documents.reduce((sum, d) => sum + d.chunkCount, 0);
-    const bytes = documents.reduce((sum, d) => sum + d.size, 0);
-    return { ready, processing, errors, chunks, bytes };
-  }, [documents]);
-
-  const createQuickCollection = async () => {
-    const name = newCollectionName.trim();
-    if (!name) return;
-    const ok = await createCollection(name);
-    setNotice(ok ? { type: 'success', text: 'Collection created.' } : { type: 'error', text: 'Collection could not be created.' });
-    if (ok) setNewCollectionName('');
   };
 
-  const upload = async () => {
-    if (!file || !uploadCollectionId || uploading) return;
+  const uploadAll = async () => {
+    if (!files.length || !targetCollection) {
+      onNotice({ type: 'error', text: 'Select a collection first.' });
+      return;
+    }
     setUploading(true);
-    setUploadProgress(0);
-    setNotice(null);
-    const form = new FormData();
-    form.append('file', file);
-    form.append('collectionId', uploadCollectionId);
+    const initial: Record<string, 'pending' | 'uploading' | 'done' | 'error'> = {};
+    files.forEach(f => initial[f.name] = 'pending');
+    setProgress(initial);
 
-    const progressInterval = setInterval(() => {
-      setUploadProgress(p => Math.min(p + 8, 85));
-    }, 200);
-
-    try {
-      const res = await fetch('/api/ingest', { method: 'POST', body: form });
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      let data: { document?: DocumentMeta; error?: string } = {};
-      try { data = await res.json(); } catch {
-        throw new Error(res.status === 413 ? 'File is too large. Try a smaller file.' : `Upload failed (${res.status}).`);
+    for (const file of files) {
+      setProgress(p => ({ ...p, [file.name]: 'uploading' }));
+      const form = new FormData();
+      form.append('file', file);
+      form.append('collectionId', targetCollection);
+      try {
+        const res = await fetch('/api/ingest', { method: 'POST', body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        setProgress(p => ({ ...p, [file.name]: 'done' }));
+        if (data.document) onCreate(data.document);
+      } catch (err) {
+        setProgress(p => ({ ...p, [file.name]: 'error' }));
+        onNotice({ type: 'error', text: err instanceof Error ? err.message : `Failed: ${file.name}` });
       }
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-      setNotice({
-        type: data.document?.status === 'ready' ? 'success' : 'error',
-        text: data.document?.status === 'ready'
-          ? `✓ "${data.document.name}" indexed with ${data.document.chunkCount} chunks.`
-          : data.document?.error || 'No extractable text was found.',
-      });
-      setFile(null);
-      await refreshDocuments();
-    } catch (err) {
-      clearInterval(progressInterval);
-      setNotice({ type: 'error', text: err instanceof Error ? err.message : 'Upload failed.' });
-    } finally {
-      setUploading(false);
-      setTimeout(() => setUploadProgress(0), 1000);
     }
-  };
-
-  const removeDocument = async (id: string) => {
-    setDeleting(id);
-    const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      setNotice({ type: 'success', text: 'Document removed.' });
-      await refreshDocuments();
-    } else {
-      setNotice({ type: 'error', text: 'Document could not be removed.' });
-    }
-    setDeleting(null);
-  };
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
-    return sortDir === 'asc' ? <ChevronUp className="h-3 w-3 text-accent" /> : <ChevronDown className="h-3 w-3 text-accent" />;
+    setUploading(false);
+    const finalProgress = { ...progress };
+    files.forEach(f => { if (finalProgress[f.name] !== 'error') finalProgress[f.name] = 'done'; });
+    const successCount = files.filter(f => finalProgress[f.name] === 'done').length;
+    if (successCount > 0) onNotice({ type: 'success', text: `${successCount} file${successCount > 1 ? 's' : ''} indexed successfully.` });
+    setTimeout(() => { setFiles([]); setProgress({}); }, 2000);
   };
 
   return (
-    <AuthGate>
-      {viewDoc && <DocumentModal doc={viewDoc} onClose={() => setViewDoc(null)} />}
+    <div className="space-y-3">
+      {/* Collection picker */}
+      <div className="flex items-center gap-3">
+        <label className="text-xs font-medium text-text-secondary shrink-0">Collection</label>
+        <CollectionPicker collections={collections} value={targetCollection} onChange={setTargetCollection} includeAll />
+      </div>
 
-      <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8 pb-24 lg:pb-8">
-        <div className="mx-auto max-w-7xl space-y-6">
-          <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      {/* Drop zone */}
+      <div
+        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={e => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files); }}
+        onClick={() => inputRef.current?.click()}
+        className={`flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed cursor-pointer transition-all py-8 px-4 ${
+          dragOver ? 'border-accent bg-accent/8 scale-[1.01]' : 'border-border hover:border-accent/40 hover:bg-bg-hover/30'
+        }`}
+      >
+        <UploadCloud className={`h-8 w-8 transition-colors ${dragOver ? 'text-accent' : 'text-text-muted'}`} />
+        <div className="text-center">
+          <p className="text-sm font-medium">{dragOver ? 'Drop to add' : 'Drop files or click to browse'}</p>
+          <p className="text-xs text-text-muted mt-0.5">PDF, MD, TXT, CSV, JSON, code files · Max 15MB each</p>
+        </div>
+        <input ref={inputRef} type="file" multiple accept=".pdf,.txt,.md,.markdown,.csv,.json,.js,.ts,.tsx,.jsx,.py,.java,.c,.cpp,.go,.rs,.rb,.php,.html,.css,.yml,.yaml,.xml,.sql,.log" className="hidden"
+          onChange={e => e.target.files && addFiles(e.target.files)} />
+      </div>
+
+      {/* File list */}
+      {files.length > 0 && (
+        <div className="space-y-1.5">
+          {files.map(f => {
+            const status = progress[f.name];
+            return (
+              <div key={f.name} className="flex items-center gap-3 rounded-xl border border-border bg-bg-card/60 px-3 py-2.5">
+                <FileTypeIcon type={f.type} name={f.name} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium">{f.name}</p>
+                  <p className="text-[10px] text-text-muted">{formatBytes(f.size)}</p>
+                </div>
+                {!status && (
+                  <button onClick={e => { e.stopPropagation(); setFiles(prev => prev.filter(x => x.name !== f.name)); }}
+                    className="p-1 rounded text-text-muted hover:text-danger transition-colors">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                {status === 'uploading' && <Loader2 className="h-4 w-4 animate-spin text-accent shrink-0" />}
+                {status === 'done' && <CheckCircle2 className="h-4 w-4 text-success shrink-0" />}
+                {status === 'error' && <AlertCircle className="h-4 w-4 text-danger shrink-0" />}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {files.length > 0 && (
+        <button
+          onClick={uploadAll}
+          disabled={uploading || !targetCollection}
+          className="w-full flex items-center justify-center gap-2 rounded-xl bg-accent py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+        >
+          {uploading ? <><Loader2 className="h-4 w-4 animate-spin" /> Indexing…</> : <><Zap className="h-4 w-4" /> Upload and index {files.length} file{files.length > 1 ? 's' : ''}</>}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────────
+export default function DocumentsPage() {
+  const { collections, refresh: refreshCollections } = useCollections();
+  const [docs, setDocs] = useState<DocumentMeta[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState<Notice>(null);
+  const [filterCollection, setFilterCollection] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'' | 'ready' | 'error' | 'processing'>('');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortField>('createdAt');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [previewDoc, setPreviewDoc] = useState<DocumentMeta | null>(null);
+  const [showUpload, setShowUpload] = useState(true);
+
+  const loadDocs = useCallback(async () => {
+    try {
+      const url = filterCollection ? `/api/documents?collectionId=${filterCollection}` : '/api/documents';
+      const r = await fetch(url);
+      const d = await r.json();
+      setDocs(d.documents || []);
+    } catch {
+      setNotice({ type: 'error', text: 'Could not load documents.' });
+    } finally { setLoading(false); }
+  }, [filterCollection]);
+
+  useEffect(() => { loadDocs(); }, [loadDocs]);
+
+  // Auto-refresh processing docs
+  useEffect(() => {
+    const hasProcessing = docs.some(d => d.status === 'processing');
+    if (!hasProcessing) return;
+    const t = setInterval(loadDocs, 3000);
+    return () => clearInterval(t);
+  }, [docs, loadDocs]);
+
+  const deleteDoc = async (id: string) => {
+    if (!confirm('Delete this document? This cannot be undone.')) return;
+    await fetch(`/api/documents/${id}`, { method: 'DELETE' });
+    setDocs(prev => prev.filter(d => d.id !== id));
+    setSelected(prev => { const s = new Set(prev); s.delete(id); return s; });
+    setNotice({ type: 'success', text: 'Document deleted.' });
+  };
+
+  const deleteSelected = async () => {
+    if (!confirm(`Delete ${selected.size} documents?`)) return;
+    for (const id of selected) {
+      await fetch(`/api/documents/${id}`, { method: 'DELETE' });
+    }
+    setDocs(prev => prev.filter(d => !selected.has(d.id)));
+    setSelected(new Set());
+    setNotice({ type: 'success', text: `${selected.size} documents deleted.` });
+  };
+
+  const handleSelect = (id: string, checked: boolean) => {
+    setSelected(prev => { const s = new Set(prev); checked ? s.add(id) : s.delete(id); return s; });
+  };
+
+  const toggleAll = (checked: boolean) => {
+    setSelected(checked ? new Set(filtered.map(d => d.id)) : new Set());
+  };
+
+  const toggleSort = (field: SortField) => {
+    if (sort === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSort(field); setSortDir('desc'); }
+  };
+
+  const filtered = useMemo(() => {
+    let list = [...docs];
+    if (filterCollection) list = list.filter(d => d.collectionId === filterCollection);
+    if (filterStatus) list = list.filter(d => d.status === filterStatus);
+    if (search) list = list.filter(d => d.name.toLowerCase().includes(search.toLowerCase()));
+    list.sort((a, b) => {
+      const mul = sortDir === 'asc' ? 1 : -1;
+      if (sort === 'name') return mul * a.name.localeCompare(b.name);
+      if (sort === 'size') return mul * (a.size - b.size);
+      if (sort === 'status') return mul * a.status.localeCompare(b.status);
+      return mul * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    });
+    return list;
+  }, [docs, filterCollection, filterStatus, search, sort, sortDir]);
+
+  const readyCount = docs.filter(d => d.status === 'ready').length;
+  const errorCount = docs.filter(d => d.status === 'error').length;
+  const totalSize = docs.reduce((s, d) => s + d.size, 0);
+  const totalChunks = docs.reduce((s, d) => s + d.chunkCount, 0);
+
+  const SortBtn = ({ field, label }: { field: SortField; label: string }) => (
+    <button onClick={() => toggleSort(field)} className="flex items-center gap-1 text-[11px] font-semibold text-text-muted hover:text-text-primary transition-colors">
+      {label}
+      {sort === field ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
+    </button>
+  );
+
+  return (
+    <AuthGate>
+      <div className="min-h-screen pb-24 lg:pb-8">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+
+          {/* Header */}
+          <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <p className="text-xs font-mono font-bold tracking-widest text-text-muted">DOCUMENT VAULT</p>
-              <h1 className="mt-2 text-3xl font-bold tracking-tight">Upload & Manage Documents</h1>
-              <p className="mt-2 max-w-2xl text-sm text-text-secondary">
-                Add PDFs, notes, datasets, markdown, and code files. DocuMind chunks and embeds them for cited answers.
-              </p>
+              <h1 className="mt-1 text-3xl font-bold tracking-tight">Upload &amp; Manage Documents</h1>
+              <p className="mt-1 text-sm text-text-secondary">Add PDFs, notes, datasets, markdown, and code files. DocuMind chunks and embeds them for cited answers.</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <CollectionPicker collections={collections} value={collectionId} onChange={setCollectionId} includeAll />
-              <button
-                onClick={refreshDocuments}
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-bg-card px-3 text-sm text-text-secondary transition-colors hover:text-text-primary"
-              >
-                <RefreshCw className={`h-4 w-4 ${loadingDocs ? 'animate-spin' : ''}`} />
-                Refresh
+            <div className="flex items-center gap-2 flex-wrap">
+              <Link href="/collections" className="flex items-center gap-1.5 rounded-xl border border-border bg-bg-card px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:border-border/80 transition-colors">
+                <FolderOpen className="h-3.5 w-3.5" /> Collections
+              </Link>
+              <button onClick={loadDocs} className="flex items-center gap-1.5 rounded-xl border border-border bg-bg-card px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors">
+                <RefreshCw className="h-3.5 w-3.5" /> Refresh
               </button>
             </div>
-          </header>
+          </div>
 
-          {/* Stats */}
-          <section className="grid gap-3 sm:grid-cols-5">
-            {[
-              { label: 'Ready', value: stats.ready, color: 'text-success', onClick: () => setStatusFilter(statusFilter === 'ready' ? 'all' : 'ready') },
-              { label: 'Processing', value: stats.processing, color: 'text-accent-2', onClick: () => setStatusFilter(statusFilter === 'processing' ? 'all' : 'processing') },
-              { label: 'Errors', value: stats.errors, color: 'text-danger', onClick: () => setStatusFilter(statusFilter === 'error' ? 'all' : 'error') },
-              { label: 'Total Chunks', value: stats.chunks, color: 'text-accent', onClick: () => {} },
-              { label: 'Stored', value: formatBytes(stats.bytes), color: 'text-text-primary', onClick: () => {} },
-            ].map(({ label, value, color, onClick }) => (
-              <button key={label} onClick={onClick} className={`glass rounded-xl p-4 text-left transition-all hover:border-accent/30 ${statusFilter === label.toLowerCase().replace(' ', '') ? 'border-accent/40 bg-accent/5' : ''}`}>
-                <p className="text-xs text-text-muted">{label}</p>
-                <p className={`mt-1.5 text-2xl font-bold ${color}`}>{value}</p>
-              </button>
-            ))}
-          </section>
-
+          {/* Notice */}
           {notice && (
-            <div className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${
-              notice.type === 'success' ? 'border-success/25 bg-success/10 text-success' : 'border-danger/25 bg-danger/10 text-danger'
-            }`}>
-              {notice.type === 'success' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />}
-              <span className="flex-1">{notice.text}</span>
-              <button onClick={() => setNotice(null)}><X className="h-4 w-4 opacity-60 hover:opacity-100" /></button>
+            <div className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm ${notice.type === 'success' ? 'border-success/25 bg-success/10 text-success' : 'border-danger/25 bg-danger/10 text-danger'}`}>
+              {notice.type === 'success' ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertCircle className="h-4 w-4 shrink-0" />}
+              <span>{notice.text}</span>
+              <button onClick={() => setNotice(null)} className="ml-auto"><X className="h-4 w-4" /></button>
             </div>
           )}
 
-          <section className="grid gap-6 xl:grid-cols-[minmax(300px,380px)_1fr]">
+          {/* Stats row */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: 'Ready', value: readyCount, color: 'text-success', icon: CheckCircle2 },
+              { label: 'Errors', value: errorCount, color: 'text-danger', icon: AlertCircle },
+              { label: 'Total Chunks', value: totalChunks.toLocaleString(), color: 'text-accent', icon: Layers },
+              { label: 'Stored', value: formatBytes(totalSize), color: 'text-text-primary', icon: Database },
+            ].map(({ label, value, color, icon: Icon }) => (
+              <div key={label} className="glass rounded-xl p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-text-muted">{label}</p>
+                  <Icon className={`h-3.5 w-3.5 ${color} opacity-60`} />
+                </div>
+                <p className={`text-2xl font-bold ${color}`}>{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-5">
             {/* Upload panel */}
-            <div className="space-y-4">
-              <div className="glass rounded-xl p-5">
-                <div className="mb-4 flex items-center gap-2">
-                  <UploadCloud className="h-5 w-5 text-accent" />
-                  <h2 className="font-semibold">Add Document</h2>
+            <div className="lg:col-span-2">
+              <div className="glass rounded-2xl p-5 space-y-4 sticky top-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-bold text-sm flex items-center gap-2"><UploadCloud className="h-4 w-4 text-accent" /> Add Document</h2>
+                  <button onClick={() => setShowUpload(o => !o)} className="text-text-muted hover:text-text-primary transition-colors">
+                    {showUpload ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
                 </div>
-
-                {collections.length === 0 && !loadingCollections ? (
-                  <div className="rounded-lg border border-border bg-bg-secondary/50 p-4">
-                    <p className="text-sm text-text-secondary mb-3">Create a collection before uploading.</p>
-                    <div className="flex gap-2">
-                      <input
-                        value={newCollectionName}
-                        onChange={(e) => setNewCollectionName(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && createQuickCollection()}
-                        placeholder="Research, Legal, Product..."
-                        className="min-w-0 flex-1 rounded-lg border border-border bg-bg-card px-3 py-2 text-sm outline-none focus:border-accent/50"
-                      />
-                      <button
-                        onClick={createQuickCollection}
-                        disabled={!newCollectionName.trim()}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
-                      >
-                        <FolderPlus className="h-4 w-4" /> Create
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <label className="mb-2 block text-xs font-medium text-text-muted">Target Collection</label>
-                    <CollectionPicker collections={collections} value={uploadCollectionId} onChange={setUploadCollectionId} />
-
-                    <div
-                      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-                      onDragLeave={() => setDragging(false)}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        setDragging(false);
-                        const dropped = e.dataTransfer.files?.[0];
-                        if (dropped) setFile(dropped);
-                      }}
-                      className={`mt-4 rounded-xl border border-dashed p-6 text-center transition-all cursor-pointer ${
-                        dragging ? 'border-accent bg-accent/8 scale-[1.01]' : 'border-border bg-bg-secondary/50 hover:border-border/60'
-                      }`}
-                      onClick={() => document.getElementById('file-input')?.click()}
-                    >
-                      <UploadCloud className={`mx-auto h-8 w-8 mb-2 transition-colors ${dragging ? 'text-accent' : 'text-text-muted'}`} />
-                      {file ? (
-                        <div>
-                          <p className="text-sm font-medium text-text-primary">{file.name}</p>
-                          <p className="text-xs text-text-muted mt-1">{formatBytes(file.size)} — ready to upload</p>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                            className="mt-2 text-xs text-text-muted hover:text-danger transition-colors"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ) : (
-                        <div>
-                          <p className="text-sm font-medium">Drop a file or click to choose</p>
-                          <p className="mt-1 text-xs text-text-muted">PDF, TXT, MD, CSV, JSON, and code files (max 15MB)</p>
-                        </div>
-                      )}
-                    </div>
-                    <input id="file-input" type="file" className="hidden"
-                      accept=".pdf,.txt,.md,.markdown,.csv,.json,.js,.ts,.tsx,.jsx,.py,.java,.c,.cpp,.h,.go,.rs,.rb,.php,.html,.css,.yml,.yaml,.xml,.sql"
-                      onChange={(e) => setFile(e.target.files?.[0] || null)}
-                    />
-
-                    {uploading && (
-                      <div className="mt-3">
-                        <div className="flex justify-between text-xs text-text-muted mb-1">
-                          <span>Indexing…</span><span>{uploadProgress}%</span>
-                        </div>
-                        <div className="h-1.5 w-full bg-bg-hover rounded-full overflow-hidden">
-                          <div className="h-full bg-accent rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
-                        </div>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={upload}
-                      disabled={!file || !uploadCollectionId || uploading}
-                      className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {uploading ? (
-                        <><Loader2 className="h-4 w-4 animate-spin" /> Indexing…</>
-                      ) : (
-                        <><Plus className="h-4 w-4" /> Upload and index</>
-                      )}
-                    </button>
-                  </>
+                {showUpload && (
+                  <UploadZone
+                    collectionId={filterCollection}
+                    collections={collections}
+                    onCreate={doc => { setDocs(prev => [doc, ...prev]); refreshCollections(); }}
+                    onNotice={setNotice}
+                  />
                 )}
-              </div>
-
-              {/* Supported formats */}
-              <div className="glass rounded-xl p-4">
-                <p className="text-xs font-semibold text-text-muted mb-3">SUPPORTED FORMATS</p>
-                <div className="grid grid-cols-2 gap-1.5 text-xs text-text-secondary">
-                  {['PDF', 'TXT', 'Markdown', 'CSV', 'JSON', 'JavaScript', 'TypeScript', 'Python', 'Go', 'Rust', 'Java', 'C/C++'].map(f => (
-                    <div key={f} className="flex items-center gap-1.5">
-                      <div className="h-1 w-1 rounded-full bg-success" />{f}
-                    </div>
-                  ))}
+                <div className="pt-2 border-t border-border/50">
+                  <p className="text-[11px] text-text-muted font-medium mb-2">SUPPORTED FORMATS</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['PDF', 'MD', 'TXT', 'CSV', 'JSON', 'JS/TS', 'Python', 'SQL', 'YAML', 'HTML'].map(f => (
+                      <span key={f} className="rounded-md border border-border/60 bg-bg-secondary/40 px-2 py-0.5 text-[10px] font-mono text-text-muted">{f}</span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-
-              {/* Quick links */}
-              <div className="glass rounded-xl p-4 space-y-2">
-                <p className="text-xs font-semibold text-text-muted mb-2">QUICK ACTIONS</p>
-                <Link href="/collections" className="flex items-center gap-2 text-xs text-text-secondary hover:text-accent transition-colors py-1">
-                  <FolderPlus className="h-3.5 w-3.5" /> Manage collections
-                </Link>
-                <Link href="/chat" className="flex items-center gap-2 text-xs text-text-secondary hover:text-accent transition-colors py-1">
-                  <MessageSquare className="h-3.5 w-3.5" /> Chat with documents
-                </Link>
-                <Link href="/search" className="flex items-center gap-2 text-xs text-text-secondary hover:text-accent transition-colors py-1">
-                  <Search className="h-3.5 w-3.5" /> Search passages
-                </Link>
               </div>
             </div>
 
-            {/* Documents table */}
-            <div className="glass overflow-hidden rounded-xl">
-              <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="font-semibold">Indexed documents</h2>
-                  <p className="text-xs text-text-muted">Auto-refreshes every 8s · {filteredDocuments.length} shown</p>
-                </div>
+            {/* Document list */}
+            <div className="lg:col-span-3 space-y-3">
+              {/* Toolbar */}
+              <div className="glass rounded-xl px-4 py-3 space-y-3">
                 <div className="flex items-center gap-2">
-                  {statusFilter !== 'all' && (
-                    <button onClick={() => setStatusFilter('all')} className="inline-flex items-center gap-1 rounded-lg border border-accent/30 bg-accent/10 px-2 py-1 text-xs text-accent hover:bg-accent/20 transition-colors">
-                      <Filter className="h-3 w-3" /> {statusFilter} <X className="h-3 w-3" />
-                    </button>
-                  )}
-                  <div className="relative w-full sm:w-64">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-                    <input
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Filter filenames…"
-                      className="w-full rounded-lg border border-border bg-bg-card py-2 pl-9 pr-3 text-sm outline-none focus:border-accent/50"
-                    />
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Filter filenames…"
+                      className="w-full rounded-lg border border-border bg-bg-secondary/50 pl-8 pr-3 py-1.5 text-xs outline-none focus:border-accent/50 transition-colors" />
+                  </div>
+                  <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as typeof filterStatus)}
+                    className="rounded-lg border border-border bg-bg-secondary/50 px-2.5 py-1.5 text-xs text-text-secondary outline-none focus:border-accent/50 transition-colors">
+                    <option value="">All status</option>
+                    <option value="ready">Ready</option>
+                    <option value="processing">Processing</option>
+                    <option value="error">Error</option>
+                  </select>
+                  <select value={filterCollection} onChange={e => setFilterCollection(e.target.value)}
+                    className="rounded-lg border border-border bg-bg-secondary/50 px-2.5 py-1.5 text-xs text-text-secondary outline-none focus:border-accent/50 transition-colors">
+                    <option value="">All collections</option>
+                    {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-text-muted">
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0}
+                        onChange={e => toggleAll(e.target.checked)} className="h-3 w-3 rounded accent-accent" />
+                      {selected.size > 0 ? `${selected.size} selected` : 'Select all'}
+                    </label>
+                    {selected.size > 0 && (
+                      <button onClick={deleteSelected} className="flex items-center gap-1 text-danger hover:text-danger/80 transition-colors">
+                        <Trash2 className="h-3 w-3" /> Delete selected
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <SortBtn field="name" label="Name" />
+                    <SortBtn field="size" label="Size" />
+                    <SortBtn field="createdAt" label="Date" />
+                    <SortBtn field="status" label="Status" />
                   </div>
                 </div>
               </div>
 
-              {loadingDocs ? (
-                <div className="flex items-center justify-center gap-2 p-10 text-sm text-text-muted">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Loading documents…
-                </div>
-              ) : filteredDocuments.length === 0 ? (
-                <div className="p-10 text-center">
-                  <FileText className="mx-auto h-10 w-10 text-text-muted opacity-40" />
-                  <h3 className="mt-3 font-semibold">No documents found</h3>
-                  <p className="mx-auto mt-2 max-w-sm text-sm text-text-muted">
-                    {query || statusFilter !== 'all' ? 'Try clearing your filters.' : 'Upload your first document to get started.'}
+              {/* Header */}
+              <div className="glass rounded-xl overflow-hidden">
+                <div className="border-b border-border px-4 py-2.5 flex items-center justify-between">
+                  <p className="text-xs font-semibold text-text-secondary">
+                    Indexed documents
+                    <span className="ml-2 text-text-muted font-normal">Auto-refreshes every 3s · {filtered.length} shown</span>
                   </p>
                 </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left text-sm">
-                    <thead className="bg-bg-secondary/60 text-xs uppercase tracking-wide text-text-muted">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">
-                          <button onClick={() => toggleSort('name')} className="flex items-center gap-1 hover:text-text-primary transition-colors">
-                            Document <SortIcon field="name" />
-                          </button>
-                        </th>
-                        <th className="px-4 py-3 font-medium">Collection</th>
-                        <th className="px-4 py-3 font-medium">Chunks</th>
-                        <th className="px-4 py-3 font-medium">
-                          <button onClick={() => toggleSort('size')} className="flex items-center gap-1 hover:text-text-primary transition-colors">
-                            Size <SortIcon field="size" />
-                          </button>
-                        </th>
-                        <th className="px-4 py-3 font-medium">
-                          <button onClick={() => toggleSort('status')} className="flex items-center gap-1 hover:text-text-primary transition-colors">
-                            Status <SortIcon field="status" />
-                          </button>
-                        </th>
-                        <th className="px-4 py-3 font-medium">
-                          <button onClick={() => toggleSort('createdAt')} className="flex items-center gap-1 hover:text-text-primary transition-colors">
-                            Added <SortIcon field="createdAt" />
-                          </button>
-                        </th>
-                        <th className="px-4 py-3 font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredDocuments.map((doc) => (
-                        <tr key={doc.id} className="border-t border-border/70 hover:bg-bg-secondary/30 transition-colors">
-                          <td className="max-w-[220px] px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <FileTypeIcon type={doc.type} name={doc.name} />
-                              <div>
-                                <div className="truncate font-medium">{doc.name}</div>
-                                {doc.error && <div className="mt-0.5 truncate text-xs text-danger" title={doc.error}>{doc.error.slice(0, 60)}…</div>}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-text-secondary text-xs">{collectionName(collections, doc.collectionId)}</td>
-                          <td className="px-4 py-3 text-text-secondary font-mono text-xs">{doc.chunkCount}</td>
-                          <td className="px-4 py-3 text-text-secondary text-xs">{formatBytes(doc.size)}</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusClass(doc.status)}`}>
-                              {doc.status === 'processing' && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
-                              {doc.status === 'ready' && <div className="h-1.5 w-1.5 rounded-full bg-success" />}
-                              {doc.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-text-muted text-xs">{relativeTime(doc.createdAt)}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => setViewDoc(doc)}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-accent/10 hover:text-accent"
-                                title="View details"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                              </button>
-                              <Link
-                                href={`/chat?collectionId=${doc.collectionId}`}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-accent/10 hover:text-accent"
-                                title="Chat about this"
-                              >
-                                <MessageSquare className="h-3.5 w-3.5" />
-                              </Link>
-                              <button
-                                onClick={() => removeDocument(doc.id)}
-                                disabled={deleting === doc.id}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-40"
-                                title={`Delete ${doc.name}`}
-                              >
-                                {deleting === doc.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </section>
 
-          <div className="rounded-xl border border-border bg-bg-secondary/35 px-4 py-3 text-sm text-text-secondary">
-            Ready to ask questions?{' '}
-            <Link href="/chat" className="text-accent hover:underline">Open Chat</Link>
-            {' '}and scope answers to any collection.
+                {loading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="h-6 w-6 animate-spin text-accent" />
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+                    <FileText className="h-12 w-12 text-text-muted opacity-30 mb-3" />
+                    <p className="font-medium text-text-secondary">
+                      {docs.length === 0 ? 'No documents yet' : 'No documents match your filters'}
+                    </p>
+                    <p className="text-sm text-text-muted mt-1">
+                      {docs.length === 0 ? 'Upload your first file to get started.' : 'Try adjusting your search or filters.'}
+                    </p>
+                  </div>
+                ) : (
+                  filtered.map(doc => (
+                    <DocRow
+                      key={doc.id} doc={doc} collections={collections}
+                      selected={selected.has(doc.id)}
+                      onSelect={handleSelect}
+                      onDelete={deleteDoc}
+                      onPreview={setPreviewDoc}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {previewDoc && <PreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     </AuthGate>
   );
 }

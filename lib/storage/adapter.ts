@@ -1,10 +1,4 @@
-// Storage adapter contract.
-//
-// Both the JSON-file adapter (zero-setup) and the Postgres + pgvector adapter
-// implement this interface. All methods are scoped by userId so data is
-// isolated per account.
-
-import { Chunk, Citation, Collection, DocumentMeta, User } from '../types';
+import { Chunk, Citation, Collection, DocumentMeta, User, ChatSession, ChatSessionMessage } from '../types';
 
 export interface SearchOpts {
   userId: string;
@@ -13,8 +7,6 @@ export interface SearchOpts {
 }
 
 export interface StorageAdapter {
-  init(): Promise<void>;
-
   // Users
   createUser(user: User, passwordHash: string): Promise<User>;
   getUserByEmail(email: string): Promise<(User & { passwordHash: string }) | null>;
@@ -24,15 +16,24 @@ export interface StorageAdapter {
   // Collections
   getCollections(userId: string): Promise<Collection[]>;
   createCollection(c: Collection): Promise<Collection>;
+  updateCollection(userId: string, id: string, updates: { name?: string; description?: string }): Promise<Collection | null>;
   deleteCollection(userId: string, id: string): Promise<void>;
-  updateCollection?(userId: string, id: string, collection: Collection): Promise<void>;
 
   // Documents
   getDocuments(userId: string, collectionId?: string): Promise<DocumentMeta[]>;
   saveDocument(doc: DocumentMeta): Promise<void>;
   deleteDocument(userId: string, id: string): Promise<void>;
 
-  // Chunks + retrieval
+  // Chunks
   addChunks(chunks: Chunk[]): Promise<void>;
+  getChunks(userId: string, documentId: string): Promise<Chunk[]>;
   search(queryEmbedding: number[], opts: SearchOpts): Promise<Citation[]>;
+
+  // Chat sessions
+  getChatSessions(userId: string): Promise<ChatSession[]>;
+  createChatSession(session: ChatSession): Promise<ChatSession>;
+  updateChatSession(userId: string, sessionId: string, updates: { title?: string; messageCount?: number; updatedAt?: string }): Promise<void>;
+  deleteChatSession(userId: string, sessionId: string): Promise<void>;
+  getChatMessages(userId: string, sessionId: string): Promise<ChatSessionMessage[]>;
+  addChatMessage(msg: ChatSessionMessage): Promise<void>;
 }

@@ -1,61 +1,72 @@
-// Thin facade over the selected storage adapter (JSON or Postgres+pgvector).
-//
-// All operations are scoped by userId. Routes call these helpers; the adapter
-// is chosen automatically based on whether DATABASE_URL is configured.
+// Thin facade over the active storage adapter.
+// All other code imports from here — never from individual adapters directly.
 
-import { Chunk, Citation, Collection, DocumentMeta } from './types';
-import { getStorage } from './storage';
+import { getStorage } from './storage/index';
+import { Chunk, Collection, DocumentMeta, User, ChatSession, ChatSessionMessage } from './types';
+import { SearchOpts } from './storage/adapter';
 
-export { getStorage } from './storage';
-
-export async function getCollections(userId: string): Promise<Collection[]> {
-  return getStorage().getCollections(userId);
+export async function createUser(user: User, passwordHash: string) {
+  return (await getStorage()).createUser(user, passwordHash);
+}
+export async function getUserByEmail(email: string) {
+  return (await getStorage()).getUserByEmail(email);
+}
+export async function getUserById(id: string) {
+  return (await getStorage()).getUserById(id);
+}
+export async function updateUser(userId: string, updates: { name?: string }) {
+  return (await getStorage()).updateUser(userId, updates);
 }
 
-export async function createCollection(c: Collection): Promise<Collection> {
-  return getStorage().createCollection(c);
+export async function getCollections(userId: string) {
+  return (await getStorage()).getCollections(userId);
+}
+export async function createCollection(c: Collection) {
+  return (await getStorage()).createCollection(c);
+}
+export async function updateCollection(userId: string, id: string, updates: { name?: string; description?: string }) {
+  return (await getStorage()).updateCollection(userId, id, updates);
+}
+export async function deleteCollection(userId: string, id: string) {
+  return (await getStorage()).deleteCollection(userId, id);
 }
 
-export async function deleteCollection(userId: string, id: string): Promise<void> {
-  return getStorage().deleteCollection(userId, id);
+export async function getDocuments(userId: string, collectionId?: string) {
+  return (await getStorage()).getDocuments(userId, collectionId);
+}
+export async function saveDocument(doc: DocumentMeta) {
+  return (await getStorage()).saveDocument(doc);
+}
+export async function deleteDocument(userId: string, id: string) {
+  return (await getStorage()).deleteDocument(userId, id);
 }
 
-export async function getDocuments(
-  userId: string,
-  collectionId?: string,
-): Promise<DocumentMeta[]> {
-  return getStorage().getDocuments(userId, collectionId);
+export async function addChunks(chunks: Chunk[]) {
+  return (await getStorage()).addChunks(chunks);
+}
+export async function getChunks(userId: string, documentId: string) {
+  return (await getStorage()).getChunks(userId, documentId);
+}
+export async function search(queryEmbedding: number[], opts: SearchOpts) {
+  return (await getStorage()).search(queryEmbedding, opts);
 }
 
-export async function saveDocument(doc: DocumentMeta): Promise<void> {
-  return getStorage().saveDocument(doc);
+// Chat sessions
+export async function getChatSessions(userId: string) {
+  return (await getStorage()).getChatSessions(userId);
 }
-
-export async function deleteDocument(userId: string, id: string): Promise<void> {
-  return getStorage().deleteDocument(userId, id);
+export async function createChatSession(session: ChatSession) {
+  return (await getStorage()).createChatSession(session);
 }
-
-export async function addChunks(chunks: Chunk[]): Promise<void> {
-  return getStorage().addChunks(chunks);
+export async function updateChatSession(userId: string, sessionId: string, updates: { title?: string; messageCount?: number; updatedAt?: string }) {
+  return (await getStorage()).updateChatSession(userId, sessionId, updates);
 }
-
-export async function search(
-  queryEmbedding: number[],
-  opts: { userId: string; collectionId?: string; topK?: number },
-): Promise<Citation[]> {
-  return getStorage().search(queryEmbedding, opts);
+export async function deleteChatSession(userId: string, sessionId: string) {
+  return (await getStorage()).deleteChatSession(userId, sessionId);
 }
-
-export async function updateCollection(userId: string, id: string, name: string, description?: string): Promise<void> {
-  const storage = getStorage();
-  const collections = await storage.getCollections(userId);
-  const col = collections.find(c => c.id === id);
-  if (!col) return;
-  const updated = { ...col, name, description: description ?? col.description };
-  if (storage.updateCollection) {
-    await storage.updateCollection(userId, id, updated);
-  } else {
-    await storage.deleteCollection(userId, id);
-    await storage.createCollection(updated);
-  }
+export async function getChatMessages(userId: string, sessionId: string) {
+  return (await getStorage()).getChatMessages(userId, sessionId);
+}
+export async function addChatMessage(msg: ChatSessionMessage) {
+  return (await getStorage()).addChatMessage(msg);
 }

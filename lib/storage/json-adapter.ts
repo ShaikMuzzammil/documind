@@ -1,179 +1,148 @@
-// JSON-file storage adapter (zero external dependencies).
-//
-// Used automatically when DATABASE_URL is not configured. Data is isolated per
-// user. Suitable for local development and single-user demos. NOTE: most
-// serverless hosts (including Vercel) mount the deployed filesystem read-only
-// outside of /tmp, so every write is wrapped with a clear, friendly error
-// instead of an opaque ENOENT/EROFS crash.
+// In-memory / JSON fallback adapter (no DATABASE_URL set).
+// Data lives in module-level Maps — reset on every cold start (Vercel).
+// Use only for local development and demos; not for production.
 
-import { promises as fs } from 'fs';
-import path from 'path';
-import { Chunk, Citation, Collection, DocumentMeta, User } from '../types';
+import { Chunk, Citation, Collection, DocumentMeta, User, ChatSession, ChatSessionMessage } from '../types';
 import { cosineSimilarity } from '../embeddings';
 import { StorageAdapter, SearchOpts } from './adapter';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
-const COLLECTIONS_FILE = path.join(DATA_DIR, 'collections.json');
-const DOCUMENTS_FILE = path.join(DATA_DIR, 'documents.json');
-const CHUNKS_FILE = path.join(DATA_DIR, 'chunks.json');
-
-type StoredUser = User & { passwordHash: string };
-
-class LocalStorageUnavailableError extends Error {
-  constructor() {
-    super(
-      'Local file storage is not writable on this deployment. Set a DATABASE_URL ' +
-        '(Postgres with the pgvector extension) in your environment variables to enable saving.',
-    );
-  }
-}
-
-async function ensureDir(): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-}
-
-async function readJson<T>(file: string, fallback: T): Promise<T> {
-  try {
-    return JSON.parse(await fs.readFile(file, 'utf-8')) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-async function writeJson(file: string, data: unknown): Promise<void> {
-  try {
-    await ensureDir();
-    await fs.writeFile(file, JSON.stringify(data, null, 2), 'utf-8');
-  } catch {
-    throw new LocalStorageUnavailableError();
-  }
-
-}
+const users    = new Map<string, User & { passwordHash: string }>();
+const colls    = new Map<string, Collection>();
+const docs     = new Map<string, DocumentMeta>();
+const chunks   = new Map<string, Chunk>();
+const sessions = new Map<string, ChatSession>();
+const messages = new Map<string, ChatSessionMessage>();
 
 export class JsonAdapter implements StorageAdapter {
-  async init(): Promise<void> {
-    await ensureDir().catch(() => undefined);
-  }
-
-  // Users
   async createUser(user: User, passwordHash: string): Promise<User> {
-    const all = await readJson<StoredUser[]>(USERS_FILE, []);
-    all.push({ ...user, passwordHash });
-    await writeJson(USERS_FILE, all);
+    users.set(user.id, { ...user, passwordHash });
     return user;
   }
 
-  async getUserByEmail(email: string): Promise<StoredUser | null> {
-    const all = await readJson<StoredUser[]>(USERS_FILE, []);
-    return all.find((u) => u.email.toLowerCase() === email.toLowerCase()) || null;
+  async getUserByEmail(email: string): Promise<(User & { passwordHash: string }) | null> {
+    for (const u of users.values()) {
+      if (u.email.toLowerCase() === email.toLowerCase()) return u;
+    }
+    return null;
   }
 
   async getUserById(id: string): Promise<User | null> {
-    const all = await readJson<StoredUser[]>(USERS_FILE, []);
-    const u = all.find((x) => x.id === id);
+    const u = users.get(id);
     if (!u) return null;
-    return { id: u.id, email: u.email, name: u.name, createdAt: u.createdAt };
+    const { passwordHash: _, ...rest } = u;
+    return rest;
   }
 
   async updateUser(userId: string, updates: { name?: string }): Promise<User | null> {
-    const all = await readJson<StoredUser[]>(USERS_FILE, []);
-    const idx = all.findIndex((u) => u.id === userId);
-    if (idx === -1) return null;
-    if (updates.name !== undefined) all[idx].name = updates.name;
-    await writeJson(USERS_FILE, all);
-    const u = all[idx];
-    return { id: u.id, email: u.email, name: u.name, createdAt: u.createdAt };
+    const u = users.get(userId);
+    if (!u) return null;
+    if (updates.name) u.name = updates.name;
+    users.set(userId, u);
+    const { passwordHash: _, ...rest } = u;
+    return rest;
   }
 
-  // Collections
   async getCollections(userId: string): Promise<Collection[]> {
-    const all = await readJson<Collection[]>(COLLECTIONS_FILE, []);
-    return all.filter((c) => c.userId === userId);
+    return [...colls.values()].filter(c => c.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   async createCollection(c: Collection): Promise<Collection> {
-    const all = await readJson<Collection[]>(COLLECTIONS_FILE, []);
-    await writeJson(COLLECTIONS_FILE, [c, ...all]);
+    colls.set(c.id, c);
+    return c;
+  }
+
+  async updateCollection(userId: string, id: string, updates: { name?: string; description?: string }): Promise<Collection | null> {
+    const c = colls.get(id);
+    if (!c || c.userId !== userId) return null;
+    if (updates.name !== undefined) c.name = updates.name;
+    if (updates.description !== undefined) c.description = updates.description;
+    colls.set(id, c);
     return c;
   }
 
   async deleteCollection(userId: string, id: string): Promise<void> {
-    const cols = (await readJson<Collection[]>(COLLECTIONS_FILE, [])).filter(
-      (c) => !(c.id === id && c.userId === userId),
-    );
-    await writeJson(COLLECTIONS_FILE, cols);
-    const docs = (await readJson<DocumentMeta[]>(DOCUMENTS_FILE, [])).filter(
-      (d) => !(d.collectionId === id && d.userId === userId),
-    );
-    await writeJson(DOCUMENTS_FILE, docs);
-    const chunks = (await readJson<Chunk[]>(CHUNKS_FILE, [])).filter(
-      (ch) => !(ch.collectionId === id && ch.userId === userId),
-    );
-    await writeJson(CHUNKS_FILE, chunks);
+    const c = colls.get(id);
+    if (c?.userId === userId) colls.delete(id);
   }
 
-  async updateCollection(_userId: string, id: string, collection: Collection): Promise<void> {
-    const cols = await readJson<Collection[]>(COLLECTIONS_FILE, []);
-    const idx = cols.findIndex((c) => c.id === id);
-    if (idx !== -1) cols[idx] = collection;
-    await writeJson(COLLECTIONS_FILE, cols);
-  }
-
-  // Documents
   async getDocuments(userId: string, collectionId?: string): Promise<DocumentMeta[]> {
-    let all = (await readJson<DocumentMeta[]>(DOCUMENTS_FILE, [])).filter(
-      (d) => d.userId === userId,
-    );
-    if (collectionId) all = all.filter((d) => d.collectionId === collectionId);
-    return all;
+    return [...docs.values()]
+      .filter(d => d.userId === userId && (!collectionId || d.collectionId === collectionId))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   async saveDocument(doc: DocumentMeta): Promise<void> {
-    const all = (await readJson<DocumentMeta[]>(DOCUMENTS_FILE, [])).filter(
-      (d) => d.id !== doc.id,
-    );
-    await writeJson(DOCUMENTS_FILE, [doc, ...all]);
+    docs.set(doc.id, doc);
   }
 
   async deleteDocument(userId: string, id: string): Promise<void> {
-    const docs = (await readJson<DocumentMeta[]>(DOCUMENTS_FILE, [])).filter(
-      (d) => !(d.id === id && d.userId === userId),
-    );
-    await writeJson(DOCUMENTS_FILE, docs);
-    const chunks = (await readJson<Chunk[]>(CHUNKS_FILE, [])).filter(
-      (ch) => !(ch.documentId === id && ch.userId === userId),
-    );
-    await writeJson(CHUNKS_FILE, chunks);
+    const d = docs.get(id);
+    if (d?.userId === userId) docs.delete(id);
   }
 
-  // Chunks + retrieval
   async addChunks(newChunks: Chunk[]): Promise<void> {
-    const all = await readJson<Chunk[]>(CHUNKS_FILE, []);
-    await writeJson(CHUNKS_FILE, [...all, ...newChunks]);
+    for (const ch of newChunks) chunks.set(ch.id, ch);
+  }
+
+  async getChunks(userId: string, documentId: string): Promise<Chunk[]> {
+    return [...chunks.values()]
+      .filter(c => c.userId === userId && c.documentId === documentId)
+      .sort((a, b) => a.index - b.index);
   }
 
   async search(queryEmbedding: number[], opts: SearchOpts): Promise<Citation[]> {
     const topK = opts.topK ?? 5;
-    const docs = await this.getDocuments(opts.userId);
-    const docName = new Map(docs.map((d) => [d.id, d.name]));
-
-    let chunks = (await readJson<Chunk[]>(CHUNKS_FILE, [])).filter(
-      (c) => c.userId === opts.userId,
-    );
-    if (opts.collectionId) chunks = chunks.filter((c) => c.collectionId === opts.collectionId);
-
-    return chunks
-      .map((c) => ({ chunk: c, score: cosineSimilarity(queryEmbedding, c.embedding) }))
+    const docMap = new Map([...docs.values()].map(d => [d.id, d]));
+    const scored = [...chunks.values()]
+      .filter(c => c.userId === opts.userId && (!opts.collectionId || c.collectionId === opts.collectionId))
+      .map(c => ({ c, score: cosineSimilarity(queryEmbedding, c.embedding) }))
       .sort((a, b) => b.score - a.score)
-      .slice(0, topK)
-      .map(({ chunk, score }) => ({
-        chunkId: chunk.id,
-        documentId: chunk.documentId,
-        documentName: docName.get(chunk.documentId) || 'Unknown document',
-        index: chunk.index,
-        text: chunk.text,
-        score,
-      }));
+      .slice(0, topK);
+    return scored.map(({ c, score }) => ({
+      chunkId: c.id, documentId: c.documentId,
+      documentName: docMap.get(c.documentId)?.name || 'Unknown document',
+      index: c.index, text: c.text, score,
+    }));
+  }
+
+  // Chat sessions
+  async getChatSessions(userId: string): Promise<ChatSession[]> {
+    return [...sessions.values()].filter(s => s.userId === userId)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  async createChatSession(session: ChatSession): Promise<ChatSession> {
+    sessions.set(session.id, session);
+    return session;
+  }
+
+  async updateChatSession(userId: string, sessionId: string, updates: { title?: string; messageCount?: number; updatedAt?: string }): Promise<void> {
+    const s = sessions.get(sessionId);
+    if (!s || s.userId !== userId) return;
+    if (updates.title !== undefined) s.title = updates.title;
+    if (updates.messageCount !== undefined) s.messageCount = updates.messageCount;
+    s.updatedAt = updates.updatedAt || new Date().toISOString();
+    sessions.set(sessionId, s);
+  }
+
+  async deleteChatSession(userId: string, sessionId: string): Promise<void> {
+    const s = sessions.get(sessionId);
+    if (s?.userId === userId) {
+      sessions.delete(sessionId);
+      for (const [id, msg] of messages) {
+        if (msg.sessionId === sessionId) messages.delete(id);
+      }
+    }
+  }
+
+  async getChatMessages(userId: string, sessionId: string): Promise<ChatSessionMessage[]> {
+    return [...messages.values()]
+      .filter(m => m.sessionId === sessionId && m.userId === userId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async addChatMessage(msg: ChatSessionMessage): Promise<void> {
+    messages.set(msg.id, msg);
   }
 }

@@ -2,172 +2,163 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  BarChart3, ChevronRight, Download, FileText, FolderOpen,
-  HelpCircle, Home, Layers, LogOut, MessageSquare, Search,
-  Settings, User, Zap, KeyRound,
+  BarChart2, BookOpen, Download, FileText, FolderOpen,
+  HelpCircle, LayoutDashboard, LogOut, MessageSquare,
+  Search, Settings, User, Zap, ChevronRight, Bot,
+  Layers, Database,
 } from 'lucide-react';
 import { useUser } from '@/lib/use-user';
-import Logo from './Logo';
 
-const NAV_ITEMS = [
-  { href: '/chat',        icon: MessageSquare, label: 'Chat'        },
-  { href: '/documents',   icon: FileText,      label: 'Documents'   },
-  { href: '/collections', icon: FolderOpen,    label: 'Collections' },
-  { href: '/analytics',   icon: BarChart3,     label: 'Analytics'   },
-  { href: '/export',      icon: Download,      label: 'Export'      },
-  { href: '/search',      icon: Search,        label: 'Search'      },
-  { href: '/help',        icon: HelpCircle,    label: 'Help'        },
-  { href: '/settings',    icon: Settings,      label: 'Settings'    },
-  { href: '/profile',     icon: User,          label: 'Profile'     },
+const NAV = [
+  { href: '/chat',        label: 'Chat',        icon: MessageSquare, desc: 'Ask your docs' },
+  { href: '/documents',   label: 'Documents',   icon: FileText,      desc: 'Upload & manage' },
+  { href: '/collections', label: 'Collections', icon: FolderOpen,    desc: 'Organise files' },
+  { href: '/analytics',   label: 'Analytics',   icon: BarChart2,     desc: 'Usage insights' },
+  { href: '/search',      label: 'Search',      icon: Search,        desc: 'Semantic search' },
+  { href: '/export',      label: 'Export',      icon: Download,      desc: 'Download data' },
+  { href: '/help',        label: 'Help',        icon: HelpCircle,    desc: 'Docs & support' },
+  { href: '/settings',    label: 'Settings',    icon: Settings,      desc: 'Config & AI' },
+  { href: '/profile',     label: 'Profile',     icon: User,          desc: 'Account info' },
 ];
 
+interface QuickStats { docs: number; chunks: number; sessions: number }
+
 export default function AppSidebar() {
-  const pathname = usePathname() || '/';
-  const { user, loading, capabilities, refresh } = useUser() as {
-    user: { name?: string; email?: string } | null;
-    loading: boolean;
-    capabilities?: { ai?: boolean };
-    refresh: () => void;
+  const pathname = usePathname();
+  const { user, capabilities } = useUser();
+  const signOut = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
+    window.location.href = '/auth?mode=login';
   };
-  const [show, setShow] = useState(false);
-  const initRef = useRef(false);
+  const [stats, setStats] = useState<QuickStats | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
-    const appPaths = NAV_ITEMS.map(n => n.href);
-    setShow(appPaths.some((p) => pathname.startsWith(p)));
+    const isApp = pathname.startsWith('/chat') || pathname.startsWith('/documents') ||
+      pathname.startsWith('/collections') || pathname.startsWith('/analytics') ||
+      pathname.startsWith('/search') || pathname.startsWith('/export') ||
+      pathname.startsWith('/help') || pathname.startsWith('/settings') || pathname.startsWith('/profile');
+    if (!isApp) return;
+    Promise.all([
+      fetch('/api/documents').then(r => r.json()).catch(() => ({ documents: [] })),
+      fetch('/api/chat/sessions').then(r => r.json()).catch(() => ({ sessions: [] })),
+    ]).then(([d, s]) => {
+      const docs = d.documents || [];
+      setStats({
+        docs: docs.length,
+        chunks: docs.reduce((t: number, doc: { chunkCount?: number }) => t + (doc.chunkCount || 0), 0),
+        sessions: (s.sessions || []).length,
+      });
+    }).catch(() => undefined);
   }, [pathname]);
 
-  const logout = async () => {
-    if (initRef.current) return;
-    initRef.current = true;
-    await fetch('/api/auth/logout', { method: 'POST' });
-    await refresh();
-    initRef.current = false;
-    window.location.href = '/';
-  };
-
-  if (!show) return null;
+  const isApp = NAV.some(n => pathname.startsWith(n.href));
+  if (!isApp) return null;
 
   const initials = user?.name
     ? user.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.[0]?.toUpperCase() || '?';
 
-  const aiConfigured = capabilities?.ai;
-
   return (
-    <>
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-56 shrink-0 border-r border-border bg-bg-secondary/50 sticky top-0 h-screen">
-        {/* Brand */}
-        <div className="flex items-center gap-2.5 px-4 h-14 border-b border-border">
-          <div className="w-8 h-8 rounded-lg bg-accent-soft border border-accent/30 flex items-center justify-center">
-            <Logo className="h-4 w-4" animated />
+    <aside className={`hidden lg:flex flex-col h-screen sticky top-0 shrink-0 border-r border-border bg-bg-secondary/20 transition-all duration-200 ${collapsed ? 'w-14' : 'w-56'}`}>
+      {/* Brand */}
+      <div className={`flex items-center gap-2.5 px-3 py-4 border-b border-border ${collapsed ? 'justify-center' : ''}`}>
+        <Link href="/" className="flex items-center gap-2 min-w-0">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-2 text-white">
+            <Bot className="h-4 w-4" />
           </div>
-          <span className="font-bold text-sm tracking-tight">
-            Docu<span className="gradient-text">Mind</span>
-          </span>
-          <span className="ml-auto text-[9px] font-mono text-text-muted bg-bg-card border border-border rounded px-1.5 py-0.5">v5.2</span>
+          {!collapsed && (
+            <div className="min-w-0">
+              <span className="text-sm font-bold tracking-tight">DocuMind</span>
+              <span className="ml-1.5 text-[9px] font-mono font-bold text-text-muted border border-border/60 rounded px-1 py-px">v6</span>
+            </div>
+          )}
+        </Link>
+        {!collapsed && (
+          <button onClick={() => setCollapsed(true)} className="ml-auto p-0.5 rounded text-text-muted hover:text-text-primary transition-colors opacity-0 group-hover:opacity-100">
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* AI status */}
+      {!collapsed && (
+        <div className="px-3 pt-3">
+          <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium ${capabilities?.ai ? 'bg-success/10 border border-success/20 text-success' : 'bg-warning/10 border border-warning/20 text-warning'}`}>
+            <Zap className="h-3 w-3 shrink-0" />
+            {capabilities?.ai ? 'AI ready' : <Link href="/settings" className="hover:underline">Configure AI</Link>}
+          </div>
         </div>
+      )}
 
-        <div className="flex-1 overflow-y-auto py-3 flex flex-col">
-          <Link
-            href="/"
-            className="flex items-center gap-2 px-3 py-1.5 mx-2 rounded-lg text-xs text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors mb-2"
-          >
-            <Home className="h-3.5 w-3.5" />
-            Back to Home
-          </Link>
-
-          {!loading && !aiConfigured && (
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+        {NAV.map(({ href, label, icon: Icon, desc }) => {
+          const active = pathname.startsWith(href);
+          return (
             <Link
-              href="/settings"
-              className="mx-2 mb-2 flex items-center gap-2 rounded-lg border border-warning/25 bg-warning/8 px-3 py-2 text-xs text-warning hover:bg-warning/15 transition-colors"
+              key={href} href={href}
+              title={collapsed ? label : undefined}
+              className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
+                active
+                  ? 'bg-accent/12 text-accent font-semibold'
+                  : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
+              } ${collapsed ? 'justify-center' : ''}`}
             >
-              <KeyRound className="h-3 w-3 shrink-0" />
-              <span>Configure AI key</span>
-              <ChevronRight className="ml-auto h-3 w-3 opacity-60" />
+              <Icon className={`h-4 w-4 shrink-0 ${active ? 'text-accent' : 'text-text-muted group-hover:text-text-secondary'}`} />
+              {!collapsed && (
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate">{label}</span>
+                </div>
+              )}
+              {!collapsed && active && <ChevronRight className="h-3 w-3 shrink-0 text-accent/60" />}
             </Link>
-          )}
+          );
+        })}
+      </nav>
 
-          {aiConfigured && (
-            <div className="mx-2 mb-2 flex items-center gap-2 rounded-lg border border-success/20 bg-success/6 px-3 py-1.5 text-xs text-success">
-              <Zap className="h-3 w-3 shrink-0" />
-              <span>AI ready</span>
-            </div>
-          )}
-
-          <p className="px-4 pb-1 text-[10px] font-bold tracking-widest text-text-muted">WORKSPACE</p>
-          <nav className="space-y-0.5 px-2 flex-1">
-            {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
-              const active = pathname.startsWith(href);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    active
-                      ? 'bg-accent/12 text-accent border-l-2 border-accent ml-[-2px]'
-                      : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
-                  }`}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {label}
-                  {active && <ChevronRight className="ml-auto h-3 w-3 opacity-50" />}
-                </Link>
-              );
-            })}
-          </nav>
+      {/* Quick stats */}
+      {!collapsed && stats && (
+        <div className="mx-2 mb-2 rounded-xl border border-border/50 bg-bg-secondary/30 p-3 space-y-2">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-text-muted">Workspace</p>
+          <div className="space-y-1.5">
+            {[
+              { label: 'Documents', value: stats.docs, icon: FileText },
+              { label: 'Chunks', value: stats.chunks.toLocaleString(), icon: Layers },
+              { label: 'Sessions', value: stats.sessions, icon: MessageSquare },
+            ].map(({ label, value, icon: Icon }) => (
+              <div key={label} className="flex items-center justify-between text-[11px]">
+                <span className="flex items-center gap-1.5 text-text-muted"><Icon className="h-3 w-3" />{label}</span>
+                <span className="font-bold text-text-secondary">{value}</span>
+              </div>
+            ))}
+          </div>
         </div>
+      )}
 
-        {/* User footer */}
-        <div className="border-t border-border p-3">
-          <Link href="/profile" className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-bg-hover transition-colors">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent-2 flex items-center justify-center text-white text-xs font-bold shrink-0">
-              {loading ? '…' : initials}
-            </div>
+      {/* User footer */}
+      <div className={`border-t border-border p-2 ${collapsed ? 'flex justify-center' : ''}`}>
+        {collapsed ? (
+          <Link href="/profile" className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-2 text-white text-xs font-bold">
+            {initials}
+          </Link>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Link href="/profile" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-2 text-white text-xs font-bold hover:opacity-90 transition-opacity">
+              {initials}
+            </Link>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium truncate">{user?.name || '—'}</p>
-              <p className="text-[10px] text-text-muted truncate">{user?.email || '—'}</p>
+              <p className="truncate text-xs font-semibold text-text-primary">{user?.name || 'User'}</p>
+              <p className="truncate text-[10px] text-text-muted">{user?.email}</p>
             </div>
-            <button
-              onClick={(e) => { e.preventDefault(); logout(); }}
-              title="Sign out"
-              className="p-1.5 rounded-lg text-text-muted hover:bg-bg-card hover:text-text-primary transition-colors shrink-0"
-            >
+            <button onClick={signOut} title="Sign out" className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors shrink-0">
               <LogOut className="h-3.5 w-3.5" />
             </button>
-          </Link>
-        </div>
-      </aside>
-
-      {/* Mobile bottom tab bar */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-bg-secondary/90 backdrop-blur">
-        <div className="flex">
-          {[
-            { href: '/chat',        icon: MessageSquare, label: 'Chat'    },
-            { href: '/documents',   icon: FileText,      label: 'Docs'    },
-            { href: '/collections', icon: Layers,        label: 'Folders' },
-            { href: '/search',      icon: Search,        label: 'Search'  },
-            { href: '/settings',    icon: Settings,      label: 'More'    },
-          ].map(({ href, icon: Icon, label }) => {
-            const active = pathname.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] transition-colors ${
-                  active ? 'text-accent' : 'text-text-muted hover:text-text-secondary'
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                {label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
-    </>
+          </div>
+        )}
+      </div>
+    </aside>
   );
 }

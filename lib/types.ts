@@ -55,3 +55,25 @@ export interface ChatMessage {
   citations?: Citation[];
   createdAt: string;
 }
+
+/** A named chat session persisted in storage. */
+export interface ChatSession {
+  id: string;
+  userId: string;
+  title: string;
+  collectionId?: string;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A message persisted within a session. */
+export interface ChatSessionMessage {
+  id: string;
+  sessionId: string;
+  userId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  citations?: Citation[];
+  createdAt: string;
+}

@@ -1,176 +1,252 @@
-# DocuMind v5
+# DocuMind v6.0 — AI-Powered RAG Document Intelligence Platform
 
-> A self-hosted RAG document intelligence platform. Upload documents, ask questions in plain language, and get grounded, cited answers — powered by your own AI keys.
+> Upload any document. Ask anything. Every answer cited back to the source.
 
-**Built by [Shaik Muzzammil](https://shaikmuzzammil.vercel.app) · [GitHub](https://github.com/ShaikMuzzammil) · [Portfolio](https://shaikmuzzammil.vercel.app)**
-
----
-
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **Multi-format upload** | PDF, TXT, Markdown, CSV, JSON, and 10+ code languages |
-| **Semantic RAG chat** | Streaming AI answers with inline source citations |
-| **Vector search** | Meaning-based passage retrieval across all documents |
-| **Collections** | Organize documents by project, client, or topic |
-| **Analytics** | Real-time workspace health and document insights |
-| **Export** | CSV, JSON, and Markdown report downloads |
-| **Self-hosted** | Your data stays in your own database |
+[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new)
 
 ---
 
-## Quick Start
+## What is DocuMind?
 
-### 1. Clone and install
-
-```bash
-git clone https://github.com/ShaikMuzzammil/documind.git
-cd documind
-npm install
-```
-
-### 2. Configure environment variables
-
-Copy `.env.example` to `.env.local` and fill in your values:
-
-```bash
-cp .env.example .env.local
-```
-
-### 3. Run development server
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) — register an account and start uploading documents.
+DocuMind is a self-hostable **Retrieval-Augmented Generation (RAG)** platform built on Next.js 15, pgvector, and any OpenAI-compatible LLM. Upload PDFs, Markdown, code, CSV, JSON — and immediately chat with your documents, search semantically, and export your knowledge base.
 
 ---
 
-## Environment Variables
+## ✨ v6.0 Feature Overview
 
-### Required
+### 🤖 AI Chat with Session Persistence
+- **Persistent chat sessions** stored in PostgreSQL — browse, rename, delete history
+- **Session sidebar** (like ChatGPT) — Today / Earlier groupings
+- **Streaming responses** with stop button
+- **Cited answers** — every claim traced to source chunk with % relevance score
+- **Markdown rendering** — headings, lists, code blocks, bold, italic
+- **Copy message** button per bubble
+- Scoped chat per collection or across all docs
+- Suggested prompts on empty state
+
+### 📄 Document Vault
+- **Multi-file upload** with drag-and-drop
+- **Chunk preview modal** — inspect every extracted text chunk from any document
+- **Batch operations** — select all, delete multiple
+- **Sort & filter** — by name, size, date, status, collection
+- **Status badges** — ready / processing / error with live auto-refresh (3s)
+- **Ask AI** button per document → opens chat scoped to that collection
+- Supports: PDF · MD · TXT · CSV · JSON · JS/TS · Python · YAML · SQL · HTML · XML · LOG
+
+### 🔍 Semantic Search
+- Vector similarity search across your entire knowledge base
+- **Highlighted matches** — query terms highlighted in results
+- **Relevance score bar** (green/amber/red) per result
+- **Collection filter** and result count selector (4/8/12/20)
+- **Search history** persisted in localStorage
+- **Ask AI about this** → jump from search result directly to chat
+- Keyboard shortcuts: Enter to search, Escape to clear
+
+### 📊 Analytics Dashboard
+- **Index health ring** — % of docs successfully indexed
+- **14-day upload bar chart** — track ingestion velocity
+- **Sparkline** on total documents card
+- **Per-collection breakdown** table — docs, chunks, size, coverage bar
+- **Storage gauge** per collection
+- Live chat session count
+- Auto-refreshes every 30 seconds
+
+### 📦 Export Center
+- **4 formats**: JSON · CSV · Markdown · JSONL (for LLM fine-tuning)
+- **3 targets**: Document index · Knowledge chunks · Chat history
+- Collection-scoped export
+- Instant browser download — no server storage
+
+### 🗂 Collections
+- Namespace documents into collections
+- Scoped chat, search, and export per collection
+- Rename inline, delete with cascade
+
+### ⚙️ Settings
+- Plug in any OpenAI-compatible provider (OpenAI, Groq, Ollama, Together)
+- Configure model name and base URL
+- Never exposes environment variable names
+- Database setup guide for pgvector
+
+### 🏠 Landing Page
+- Live demo chat terminal mockup
+- 9-feature grid with icons
+- 3-step how-it-works section
+- 12 supported formats badges
+
+---
+
+## 🚀 Deployment Guide
+
+### Prerequisites
+- [Vercel account](https://vercel.com) (free)
+- [Neon database](https://neon.tech) (free) — Postgres with pgvector
+- OpenAI API key (or compatible provider)
+
+### Step 1 — Enable pgvector on Neon
+1. Open your Neon project → **Tables** → run: `CREATE EXTENSION IF NOT EXISTS vector;`
+2. Or: Dashboard → **Extensions** → search "vector" → Enable
+
+### Step 2 — Deploy to Vercel
+```bash
+# Clone / fork the repo, then:
+vercel --prod
+```
+
+### Step 3 — Set environment variables in Vercel Dashboard
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `AUTH_SECRET` | Signs session cookies (HMAC-SHA256). Must be 32+ random characters. | `openssl rand -hex 32` |
+| `DATABASE_URL` | Neon connection string (pooled) | `postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require` |
+| `JWT_SECRET` | Random 32+ char string | `openssl rand -base64 32` |
+| `OPENAI_API_KEY` | Your LLM provider API key | `sk-...` |
+| `OPENAI_BASE_URL` | Optional: custom endpoint | `https://api.groq.com/openai/v1` |
+| `OPENAI_MODEL` | Model name | `gpt-4o-mini` |
+| `EMBED_MODEL` | Embedding model | `text-embedding-ada-002` |
 
-### AI Provider (for chat answers)
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `LLM_API_KEY` | API key for your AI provider | — |
-| `LLM_BASE_URL` | OpenAI-compatible endpoint | `https://generativelanguage.googleapis.com/v1beta/openai` |
-| `LLM_CHAT_MODEL` | Chat model name | `gemini-2.5-flash` |
-| `LLM_EMBED_MODEL` | Embedding model name | `gemini-embedding-001` |
-
-**Without `LLM_API_KEY`:** Upload, semantic search, and citation retrieval all work. Only AI-generated answers in Chat are disabled.
-
-### Supported Providers
-
-| Provider | LLM_BASE_URL | Chat Model | Notes |
-|----------|-------------|------------|-------|
-| **Google Gemini** ⭐ | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.5-flash` | Free tier available at [aistudio.google.com](https://aistudio.google.com/apikey) |
-| **OpenAI** | `https://api.openai.com/v1` | `gpt-4o-mini` | |
-| **Groq** | `https://api.groq.com/openai/v1` | `llama-3.1-70b-versatile` | Fast & free tier |
-
-### Database (production)
-
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL + pgvector connection string. Without this, data is stored in `/tmp` and resets on each redeploy. |
-
-**Free PostgreSQL options:** [Neon](https://neon.tech) · [Supabase](https://supabase.com) · [Railway](https://railway.app)
-
-```
-DATABASE_URL=postgresql://user:password@host:5432/dbname?sslmode=require
-```
-
-### Email (optional)
-
-| Variable | Description |
-|----------|-------------|
-| `RESEND_API_KEY` | Sends welcome emails on signup ([resend.com](https://resend.com)) |
-| `EMAIL_FROM` | Sender address — must be a verified domain in your Resend account |
+### Step 4 — First run
+- Navigate to your Vercel URL
+- Sign up (first user is admin)
+- Create a collection
+- Upload a document
+- Start chatting!
 
 ---
 
-## Minimum Vercel Setup
+## 🏗 Architecture
 
-```env
-AUTH_SECRET=<run: openssl rand -hex 32>
-LLM_API_KEY=<get free from aistudio.google.com/apikey>
-LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-LLM_CHAT_MODEL=gemini-2.5-flash
-DATABASE_URL=<get free from neon.tech>
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Next.js 15 (App Router)               │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐ │
+│  │  /chat       │  │  /documents  │  │  /analytics   │ │
+│  │  Sessions    │  │  Upload+     │  │  Dashboard    │ │
+│  │  Sidebar     │  │  Preview     │  │  Charts       │ │
+│  └──────┬───────┘  └──────┬───────┘  └───────────────┘ │
+│         │                 │                              │
+│  ┌──────▼─────────────────▼──────────────────────────┐  │
+│  │              API Routes (Node.js runtime)          │  │
+│  │  /api/chat  /api/chat/sessions  /api/ingest        │  │
+│  │  /api/documents  /api/search  /api/collections     │  │
+│  └──────────────────────┬────────────────────────────┘  │
+└─────────────────────────┼───────────────────────────────┘
+                          │
+         ┌────────────────┴────────────────┐
+         │                                 │
+  ┌──────▼──────┐                  ┌───────▼────────┐
+  │   pgvector  │                  │  OpenAI API    │
+  │  (Neon DB)  │                  │  (or compatible│
+  │             │                  │   provider)    │
+  │  users      │                  │                │
+  │  documents  │                  │  Embeddings    │
+  │  chunks     │  ◄──────────────►│  ada-002       │
+  │  (vectors)  │                  │                │
+  │  sessions   │                  │  Chat          │
+  │  messages   │                  │  gpt-4o-mini   │
+  └─────────────┘                  └────────────────┘
 ```
 
 ---
 
-## Deploy to Vercel
-
-1. Fork or push this repo to GitHub
-2. Connect to Vercel: [vercel.com/new](https://vercel.com/new)
-3. Add environment variables in Vercel Dashboard → Settings → Environment Variables
-4. Deploy — the app auto-configures storage based on whether `DATABASE_URL` is set
-
----
-
-## Tech Stack
-
-- **Framework:** Next.js 16 (App Router)
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS v4
-- **Database:** PostgreSQL + pgvector (or local JSON fallback)
-- **AI:** Any OpenAI-compatible provider (Gemini, OpenAI, Groq)
-- **PDF parsing:** pdf-parse v1
-- **Charts:** Recharts
-- **Auth:** HMAC-SHA256 session cookies + bcrypt passwords
-
----
-
-## Project Structure
+## 📁 Project Structure
 
 ```
-app/
-  api/           # API routes (all runtime: nodejs)
-    auth/        # Login, register, logout
-    chat/        # Streaming RAG answers
-    ingest/      # Document upload & indexing
-    documents/   # Document CRUD
-    collections/ # Collection CRUD
-    search/      # Semantic search
-    stats/       # Analytics data
-    me/          # User profile
-  chat/          # Chat workspace
-  documents/     # Document management
-  collections/   # Collection management
-  analytics/     # Workspace analytics
-  search/        # Semantic search
-  export/        # Data export
-  settings/      # App settings
-  profile/       # User profile
-  help/          # Help & guides
-lib/
-  store.ts       # Storage facade
-  storage/       # JSON + Postgres adapters
-  embeddings.ts  # Local + remote embeddings
-  llm.ts         # Streaming chat client
-  chunk.ts       # Text chunking
-  auth.ts        # Session management
-  analytics.ts   # Stats computation
-components/
-  shared/        # Navigation, Sidebar, Logo
-  app/           # AuthGate, CollectionPicker, Citations
+documind/
+├── app/
+│   ├── page.tsx              # Landing page
+│   ├── auth/page.tsx         # Login / signup
+│   ├── chat/page.tsx         # ★ Chat with session sidebar
+│   ├── documents/page.tsx    # ★ Upload + chunk preview
+│   ├── collections/page.tsx  # Collection management
+│   ├── analytics/page.tsx    # ★ Dashboard with charts
+│   ├── search/page.tsx       # ★ Semantic search
+│   ├── export/page.tsx       # ★ Export center
+│   ├── settings/page.tsx     # AI engine config
+│   ├── help/page.tsx         # Help & docs
+│   ├── profile/page.tsx      # Account info
+│   └── api/
+│       ├── auth/             # Login · logout · register
+│       ├── chat/             # Stream chat + sessions CRUD
+│       ├── documents/        # List · delete · preview
+│       ├── ingest/           # Upload + chunk + embed
+│       ├── search/           # GET + POST semantic search
+│       ├── collections/      # CRUD collections
+│       └── me/               # Current user + capabilities
+├── components/
+│   ├── app/
+│   │   ├── AuthGate.tsx      # Session guard
+│   │   ├── CollectionPicker.tsx
+│   │   └── Navigation.tsx    # Mobile bottom nav
+│   └── shared/
+│       └── AppSidebar.tsx    # ★ Sidebar with live stats
+├── lib/
+│   ├── types.ts              # All domain types
+│   ├── store.ts              # Storage facade
+│   ├── llm.ts                # LLM streaming
+│   ├── embeddings.ts         # Embedding generation
+│   ├── auth.ts               # JWT helpers
+│   ├── utils.ts              # formatBytes, relativeTime
+│   ├── use-user.ts           # User hook
+│   ├── use-collections.ts    # Collections hook
+│   └── storage/
+│       ├── adapter.ts        # Interface (+ chat sessions)
+│       ├── index.ts          # Selector
+│       ├── postgres-adapter.ts # pgvector implementation
+│       └── json-adapter.ts   # In-memory fallback
+└── next.config.js
 ```
 
 ---
 
-## Contact & Contributions
+## 🛠 Local Development
 
-- **Portfolio:** [shaikmuzzammil.vercel.app](https://shaikmuzzammil.vercel.app)
-- **GitHub:** [@ShaikMuzzammil](https://github.com/ShaikMuzzammil)
-- **Issues:** [github.com/ShaikMuzzammil/documind/issues](https://github.com/ShaikMuzzammil/documind/issues)
+```bash
+git clone <repo>
+cd documind
+npm install
 
-Bug reports and pull requests are welcome!
+# Copy env
+cp .env.example .env.local
+# Fill in DATABASE_URL, JWT_SECRET, OPENAI_API_KEY
+
+npm run dev
+# → http://localhost:3000
+```
+
+### Without a database (demo mode)
+Leave `DATABASE_URL` unset — DocuMind falls back to the in-memory JSON adapter.
+Data resets on every restart. Good for UI testing.
+
+---
+
+## 🔧 Troubleshooting
+
+### "pgvector extension is not enabled"
+Run in your Neon SQL editor:
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+Then retry uploading.
+
+### "Could not connect to the database"
+Check your `DATABASE_URL` in Vercel → Settings → Environment Variables.
+Make sure you're using the **pooled** connection string from Neon.
+
+### Uploads fail silently
+- Check file is under 15 MB
+- Ensure collection is selected
+- Check Vercel Function logs for the `/api/ingest` route
+
+### Chat returns "I couldn't find an answer"
+Documents may not be indexed yet (status = error or processing).
+Go to Documents, check status. If error, the error message explains why.
+
+---
+
+## 📄 License
+
+MIT — free to use, modify, and deploy.
+
+---
+
+*DocuMind v6.0 — Built with Next.js 15 · pgvector · OpenAI · Vercel*
