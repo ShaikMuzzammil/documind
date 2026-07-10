@@ -64,22 +64,41 @@ export default function AppSidebar() {
   return (
     <aside className={`hidden lg:flex flex-col h-screen sticky top-0 shrink-0 border-r border-border bg-bg-secondary/20 transition-all duration-200 ${collapsed ? 'w-14' : 'w-56'}`}>
       {/* Brand */}
-      <div className={`flex items-center gap-2.5 px-3 py-4 border-b border-border ${collapsed ? 'justify-center' : ''}`}>
-        <Link href="/" className="flex items-center gap-2 min-w-0">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-2 text-white">
-            <Bot className="h-4 w-4" />
-          </div>
-          {!collapsed && (
-            <div className="min-w-0">
-              <span className="text-sm font-bold tracking-tight">DocuMind</span>
-              <span className="ml-1.5 text-[9px] font-mono font-bold text-text-muted border border-border/60 rounded px-1 py-px">v6</span>
-            </div>
-          )}
-        </Link>
-        {!collapsed && (
-          <button onClick={() => setCollapsed(true)} className="ml-auto p-0.5 rounded text-text-muted hover:text-text-primary transition-colors opacity-0 group-hover:opacity-100">
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
+      <div className={`flex items-center gap-2.5 px-3 py-4 border-b border-border ${collapsed ? 'flex-col gap-1' : ''}`}>
+        {collapsed ? (
+          <>
+            <Link href="/" className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-2 text-white" title="DocuMind">
+              <Bot className="h-4 w-4" />
+            </Link>
+            {/* Expand button — always visible when collapsed */}
+            <button
+              onClick={() => setCollapsed(false)}
+              title="Expand sidebar"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </>
+        ) : (
+          <>
+            <Link href="/" className="flex items-center gap-2 min-w-0">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-2 text-white">
+                <Bot className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-sm font-bold tracking-tight">DocuMind</span>
+                <span className="ml-1.5 text-[9px] font-mono font-bold text-text-muted border border-border/60 rounded px-1 py-px">v6</span>
+              </div>
+            </Link>
+            {/* Collapse button — always visible (was broken: opacity-0 with no parent group class) */}
+            <button
+              onClick={() => setCollapsed(true)}
+              title="Collapse sidebar"
+              className="ml-auto p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
+            >
+              <LayoutDashboard className="h-3.5 w-3.5 rotate-90" />
+            </button>
+          </>
         )}
       </div>
 

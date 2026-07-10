@@ -2,11 +2,11 @@ import { NextRequest } from 'next/server';
 import { requireCurrentUser } from '@/lib/auth';
 import { embedOne } from '@/lib/embeddings';
 import { search, addChatMessage, updateChatSession } from '@/lib/store';
-import { buildMessages, streamChat } from '@/lib/llm';
+import { buildMessages, buildGeneralMessages, streamChat, GeneralMessage } from '@/lib/llm';
 import { generateId } from '@/lib/utils';
 import { ChatSessionMessage } from '@/lib/types';
 
-export const runtime = 'nodejs';
+export const runtime    = 'nodejs';
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
@@ -18,9 +18,11 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const question    = (body.question || '').toString().trim();
-  const collectionId = body.collectionId ? body.collectionId.toString() : undefined;
-  const sessionId   = body.sessionId ? body.sessionId.toString() : undefined;
+  const question     = (body.question    || '').toString().trim();
+  const collectionId  = body.collectionId ? body.collectionId.toString() : undefined;
+  const sessionId     = body.sessionId    ? body.sessionId.toString()    : undefined;
+  const mode          = body.mode === 'general' ? 'general' : 'documents';
+  const history       = Array.isArray(body.history) ? (body.history as GeneralMessage[]) : [];
 
   if (!question) {
     return new Response(JSON.stringify({ error: 'question is required' }), {
@@ -28,11 +30,54 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // 1) Retrieve relevant chunks.
-  const queryEmbedding = await embedOne(question);
-  const citations = await search(queryEmbedding, { userId: user.id, collectionId, topK: 6 });
+  // ── General AI mode: skip document search entirely ────────────────────────
+  if (mode === 'general') {
+    const messages = buildGeneralMessages(question, history);
+    const answerStream = await streamChat(messages);
+    const encoder = new TextEncoder();
+    let fullAnswer = '';
 
-  // 2) Save user message to session if sessionId provided.
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        // No citations in general mode — emit empty citations header so the
+        // client-side parser still works without changes.
+        controller.enqueue(encoder.encode(JSON.stringify({ citations: [] }) + '\n'));
+
+        const reader = answerStream.getReader();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          fullAnswer += new TextDecoder().decode(value);
+          controller.enqueue(value);
+        }
+        controller.close();
+
+        if (sessionId) {
+          const userMsg: ChatSessionMessage = {
+            id: generateId(), sessionId, userId: user.id,
+            role: 'user', content: question, createdAt: new Date().toISOString(),
+          };
+          const assistantMsg: ChatSessionMessage = {
+            id: generateId(), sessionId, userId: user.id,
+            role: 'assistant', content: fullAnswer,
+            createdAt: new Date().toISOString(),
+          };
+          await addChatMessage(userMsg).catch(() => undefined);
+          await addChatMessage(assistantMsg).catch(() => undefined);
+          await updateChatSession(user.id, sessionId, { updatedAt: new Date().toISOString() }).catch(() => undefined);
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache' },
+    });
+  }
+
+  // ── Document-grounded mode (default) ─────────────────────────────────────
+  const queryEmbedding = await embedOne(question);
+  const citations      = await search(queryEmbedding, { userId: user.id, collectionId, topK: 6 });
+
   if (sessionId) {
     const userMsg: ChatSessionMessage = {
       id: generateId(), sessionId, userId: user.id,
@@ -41,17 +86,13 @@ export async function POST(req: NextRequest) {
     await addChatMessage(userMsg).catch(() => undefined);
   }
 
-  // 3) Stream a grounded answer.
-  const messages = buildMessages(question, citations);
+  const messages     = buildMessages(question, citations);
   const answerStream = await streamChat(messages);
-
-  // 4) Collect the full answer then save assistant message & update session.
   const encoder = new TextEncoder();
   let fullAnswer = '';
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      // First line: JSON citations header.
       controller.enqueue(encoder.encode(JSON.stringify({ citations }) + '\n'));
 
       const reader = answerStream.getReader();
@@ -64,7 +105,6 @@ export async function POST(req: NextRequest) {
       }
       controller.close();
 
-      // 5) Persist assistant message + update session metadata.
       if (sessionId) {
         const assistantMsg: ChatSessionMessage = {
           id: generateId(), sessionId, userId: user.id,
@@ -72,7 +112,6 @@ export async function POST(req: NextRequest) {
           createdAt: new Date().toISOString(),
         };
         await addChatMessage(assistantMsg).catch(() => undefined);
-        // Update session with new message count estimate & timestamp
         await updateChatSession(user.id, sessionId, { updatedAt: new Date().toISOString() }).catch(() => undefined);
       }
     },

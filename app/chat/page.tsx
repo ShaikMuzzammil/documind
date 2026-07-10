@@ -1,17 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  ArrowUp, Bot, ChevronDown, ChevronRight, Copy, Check,
-  FileText, FolderOpen, Loader2, MessageSquare, Plus,
-  RefreshCw, Search, Sparkles, Trash2, Upload, X, Edit2,
-  Clock, Hash, Zap, PanelLeftClose, PanelLeft,
+  ArrowUp, Bot, ChevronDown, Copy, Check,
+  Loader2, MessageSquare, Plus, Sparkles,
+  Trash2, Upload, X, Edit2, Zap, PanelLeftClose,
+  PanelLeft, Globe, BookOpen,
 } from 'lucide-react';
 import AuthGate from '@/components/app/AuthGate';
 import { useUser } from '@/lib/use-user';
 import { useCollections } from '@/lib/use-collections';
 import { ChatSession, ChatSessionMessage, Citation } from '@/lib/types';
+
+type ChatMode = 'documents' | 'general';
 
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 function MarkdownContent({ text }: { text: string }) {
@@ -40,7 +42,7 @@ function MarkdownContent({ text }: { text: string }) {
               <span dangerouslySetInnerHTML={{ __html: inlineFormat(item) }} />
             </li>
           ))}
-        </ul>
+        </ul>,
       );
       continue;
     } else if (/^\d+\.\s/.test(line)) {
@@ -54,7 +56,7 @@ function MarkdownContent({ text }: { text: string }) {
           {items.map((item, j) => (
             <li key={j} className="text-sm leading-relaxed ml-2" dangerouslySetInnerHTML={{ __html: inlineFormat(item) }} />
           ))}
-        </ol>
+        </ol>,
       );
       continue;
     } else if (line.startsWith('```')) {
@@ -71,20 +73,20 @@ function MarkdownContent({ text }: { text: string }) {
           <pre className="bg-bg-secondary/40 p-3 overflow-x-auto text-xs font-mono leading-relaxed text-text-primary whitespace-pre">
             {codeLines.join('\n')}
           </pre>
-        </div>
+        </div>,
       );
     } else if (line.startsWith('> ')) {
       elements.push(
         <blockquote key={i} className="my-2 border-l-2 border-accent/40 pl-3 text-sm text-text-secondary italic">
           {line.slice(2)}
-        </blockquote>
+        </blockquote>,
       );
     } else if (line.trim() === '') {
       elements.push(<div key={i} className="h-2" />);
     } else {
       elements.push(
         <p key={i} className="text-sm leading-relaxed"
-          dangerouslySetInnerHTML={{ __html: inlineFormat(line) }} />
+          dangerouslySetInnerHTML={{ __html: inlineFormat(line) }} />,
       );
     }
     i++;
@@ -149,7 +151,6 @@ function MessageBubble({
 
   return (
     <div className={`group flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
-      {/* Avatar */}
       <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
         isUser ? 'bg-gradient-to-br from-accent to-accent-2 text-white text-xs font-bold' : 'border border-accent/25 bg-accent/10 text-accent'
       }`}>
@@ -174,7 +175,6 @@ function MessageBubble({
           )}
         </div>
 
-        {/* Citations */}
         {!isUser && msg.citations && msg.citations.length > 0 && !isStreaming && (
           <div className="w-full space-y-1.5">
             <p className="px-1 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
@@ -188,7 +188,6 @@ function MessageBubble({
           </div>
         )}
 
-        {/* Actions row */}
         {!isStreaming && (
           <div className={`flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity px-1 ${isUser ? 'flex-row-reverse' : ''}`}>
             <button onClick={copyText} className="flex items-center gap-1 text-[10px] text-text-muted hover:text-text-secondary transition-colors">
@@ -259,6 +258,36 @@ function SessionItem({
   );
 }
 
+// ── Mode toggle pill ──────────────────────────────────────────────────────────
+function ModeToggle({ mode, onChange }: { mode: ChatMode; onChange: (m: ChatMode) => void }) {
+  return (
+    <div className="flex items-center gap-0.5 rounded-xl border border-border bg-bg-secondary/60 p-0.5">
+      <button
+        onClick={() => onChange('documents')}
+        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all ${
+          mode === 'documents'
+            ? 'bg-accent text-white shadow-sm'
+            : 'text-text-muted hover:text-text-primary'
+        }`}
+      >
+        <BookOpen className="h-3 w-3" />
+        Documents
+      </button>
+      <button
+        onClick={() => onChange('general')}
+        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all ${
+          mode === 'general'
+            ? 'bg-accent text-white shadow-sm'
+            : 'text-text-muted hover:text-text-primary'
+        }`}
+      >
+        <Globe className="h-3 w-3" />
+        General AI
+      </button>
+    </div>
+  );
+}
+
 // ── Main chat page ─────────────────────────────────────────────────────────────
 export default function ChatPage() {
   const { user, capabilities } = useUser() as unknown as {
@@ -267,26 +296,23 @@ export default function ChatPage() {
   };
   const { collections } = useCollections();
 
-  // Sessions
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [chatMode, setChatMode] = useState<ChatMode>('documents');
 
-  // Messages
   const [messages, setMessages] = useState<{ id: string; role: string; content: string; citations?: Citation[]; createdAt: string }[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
 
-  // Input
   const [input, setInput] = useState('');
   const [collectionId, setCollectionId] = useState<string>('');
   const [loadingSession, setLoadingSession] = useState(false);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const abortRef    = useRef<AbortController | null>(null);
 
-  // Load sessions on mount
   useEffect(() => {
     fetch('/api/chat/sessions')
       .then(r => r.json())
@@ -294,12 +320,10 @@ export default function ChatPage() {
       .catch(() => undefined);
   }, []);
 
-  // Auto-scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Auto-resize textarea
   const resizeTextarea = () => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -314,7 +338,7 @@ export default function ChatPage() {
     try {
       const r = await fetch(`/api/chat/sessions/${session.id}`);
       const d = await r.json();
-      setMessages((d.messages || []).map((m: { id: string; role: string; content: string; citations?: Citation[]; createdAt: string }) => ({
+      setMessages((d.messages || []).map((m: ChatSessionMessage & { citations?: Citation[] }) => ({
         id: m.id, role: m.role, content: m.content,
         citations: m.citations || undefined, createdAt: m.createdAt,
       })));
@@ -342,10 +366,7 @@ export default function ChatPage() {
   const deleteSession = async (sessionId: string) => {
     await fetch(`/api/chat/sessions/${sessionId}`, { method: 'DELETE' });
     setSessions(prev => prev.filter(s => s.id !== sessionId));
-    if (activeSessionId === sessionId) {
-      setActiveSessionId(null);
-      setMessages([]);
-    }
+    if (activeSessionId === sessionId) { setActiveSessionId(null); setMessages([]); }
   };
 
   const renameSession = async (sessionId: string, title: string) => {
@@ -363,6 +384,13 @@ export default function ChatPage() {
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
+    // Build general-AI history from current messages
+    const history = chatMode === 'general'
+      ? messages
+          .filter(m => m.role === 'user' || m.role === 'assistant')
+          .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+      : [];
+
     // Create session if none active
     let sessionId = activeSessionId;
     if (!sessionId) {
@@ -370,7 +398,7 @@ export default function ChatPage() {
         const r = await fetch('/api/chat/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: q.slice(0, 60), collectionId: collectionId || undefined }),
+          body: JSON.stringify({ title: q.slice(0, 60), collectionId: chatMode === 'documents' ? (collectionId || undefined) : undefined }),
         });
         const d = await r.json();
         if (d.session) {
@@ -381,12 +409,9 @@ export default function ChatPage() {
       } catch { /* session-less mode */ }
     }
 
-    // Optimistic user message
     const userMsgId = `u-${Date.now()}`;
-    const userMsg = { id: userMsgId, role: 'user', content: q, createdAt: new Date().toISOString() };
-    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => [...prev, { id: userMsgId, role: 'user', content: q, createdAt: new Date().toISOString() }]);
 
-    // Placeholder for assistant
     const assistantMsgId = `a-${Date.now()}`;
     setMessages(prev => [...prev, { id: assistantMsgId, role: 'assistant', content: '', createdAt: new Date().toISOString() }]);
     setStreaming(true);
@@ -399,18 +424,22 @@ export default function ChatPage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q, collectionId: collectionId || undefined, sessionId }),
+        body: JSON.stringify({
+          question: q,
+          mode: chatMode,
+          collectionId: chatMode === 'documents' ? (collectionId || undefined) : undefined,
+          sessionId,
+          history,
+        }),
         signal: ctrl.signal,
       });
 
       if (!res.ok || !res.body) throw new Error('Stream failed');
 
-      const reader = res.body.getReader();
+      const reader  = res.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = '';
-      let citations: Citation[] | undefined;
-      let headerParsed = false;
-      let answerText = '';
+      let buffer = '', citations: Citation[] | undefined;
+      let headerParsed = false, answerText = '';
 
       for (;;) {
         const { done, value } = await reader.read();
@@ -432,17 +461,17 @@ export default function ChatPage() {
         if (headerParsed) {
           answerText += buffer;
           buffer = '';
-          const capturedAnswer = answerText;
+          const capturedAnswer   = answerText;
           const capturedCitations = citations;
           setMessages(prev => prev.map(m =>
             m.id === assistantMsgId
               ? { ...m, content: capturedAnswer, citations: capturedCitations }
-              : m
+              : m,
           ));
         }
       }
 
-      // Update session title from first user message if it's generic
+      // Auto-name new session
       if (sessionId) {
         const activeSession = sessions.find(s => s.id === sessionId);
         if (!activeSession || activeSession.title === 'New conversation') {
@@ -458,15 +487,13 @@ export default function ChatPage() {
     } catch (err) {
       if ((err as { name?: string }).name === 'AbortError') return;
       setMessages(prev => prev.map(m =>
-        m.id === assistantMsgId
-          ? { ...m, content: 'Something went wrong. Please try again.' }
-          : m
+        m.id === assistantMsgId ? { ...m, content: 'Something went wrong. Please try again.' } : m,
       ));
     } finally {
       setStreaming(false);
       setStreamingId(null);
     }
-  }, [input, streaming, activeSessionId, collectionId, sessions]);
+  }, [input, streaming, activeSessionId, collectionId, sessions, chatMode, messages]);
 
   const stopStreaming = () => {
     abortRef.current?.abort();
@@ -474,12 +501,12 @@ export default function ChatPage() {
     setStreamingId(null);
   };
 
-  const initials = user?.name
-    ? user.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
-    : user?.email?.[0]?.toUpperCase() || '?';
-
   const today = sessions.filter(s => new Date(s.updatedAt).toDateString() === new Date().toDateString());
-  const older = sessions.filter(s => new Date(s.updatedAt).toDateString() !== new Date().toDateString());
+  const older  = sessions.filter(s => new Date(s.updatedAt).toDateString() !== new Date().toDateString());
+
+  const docPrompts  = ['What are the key findings?', 'Summarize the main points', 'What are the payment terms?', 'List all action items'];
+  const genPrompts  = ['Explain quantum computing simply', 'Write a Python function to sort a list', 'What is the difference between ML and AI?', 'Help me draft a professional email'];
+  const emptyPrompts = chatMode === 'documents' ? docPrompts : genPrompts;
 
   return (
     <AuthGate>
@@ -539,40 +566,41 @@ export default function ChatPage() {
             )}
           </div>
 
-          {/* Collection filter in sidebar */}
-          <div className="border-t border-border px-3 py-3">
-            <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted mb-1.5 block">Scope</label>
-            <select
-              value={collectionId}
-              onChange={e => setCollectionId(e.target.value)}
-              className="w-full rounded-lg border border-border bg-bg-card px-2.5 py-1.5 text-xs text-text-primary focus:border-accent outline-none"
-            >
-              <option value="">All collections</option>
-              {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
+          {/* Collection scope — only shown in document mode */}
+          {chatMode === 'documents' && (
+            <div className="border-t border-border px-3 py-3">
+              <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted mb-1.5 block">Scope</label>
+              <select
+                value={collectionId}
+                onChange={e => setCollectionId(e.target.value)}
+                className="w-full rounded-lg border border-border bg-bg-card px-2.5 py-1.5 text-xs text-text-primary focus:border-accent outline-none"
+              >
+                <option value="">All collections</option>
+                {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          )}
         </aside>
 
         {/* ── Chat main area ──────────────────────────────────────── */}
         <div className="flex flex-1 flex-col min-w-0">
 
           {/* Header */}
-          <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-bg-secondary/20 shrink-0">
+          <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-bg-secondary/20 shrink-0 flex-wrap gap-y-2">
             <button
               onClick={() => setSidebarOpen(o => !o)}
-              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
+              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors shrink-0"
+              title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
             >
               {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
             </button>
 
-            <div className="flex items-center gap-2 min-w-0">
-              <Bot className="h-4 w-4 text-accent shrink-0" />
-              <span className="text-sm font-semibold truncate">
-                {activeSessionId ? (sessions.find(s => s.id === activeSessionId)?.title || 'Chat') : 'DocuMind Chat'}
-              </span>
+            {/* Mode toggle — centre of header */}
+            <div className="flex-1 flex justify-center">
+              <ModeToggle mode={chatMode} onChange={m => { setChatMode(m); setMessages([]); setActiveSessionId(null); }} />
             </div>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {capabilities?.ai ? (
                 <span className="flex items-center gap-1.5 text-[10px] text-success bg-success/10 border border-success/20 rounded-full px-2 py-0.5">
                   <Zap className="h-3 w-3" /> AI ready
@@ -582,12 +610,11 @@ export default function ChatPage() {
                   Configure AI
                 </Link>
               )}
-              <Link href="/documents" className="flex items-center gap-1.5 text-[10px] text-text-muted hover:text-text-primary bg-bg-card border border-border rounded-full px-2.5 py-1 transition-colors">
-                <Upload className="h-3 w-3" /> Upload
-              </Link>
-              <Link href="/search" className="flex items-center gap-1.5 text-[10px] text-text-muted hover:text-text-primary bg-bg-card border border-border rounded-full px-2.5 py-1 transition-colors">
-                <Search className="h-3 w-3" /> Search
-              </Link>
+              {chatMode === 'documents' && (
+                <Link href="/documents" className="flex items-center gap-1.5 text-[10px] text-text-muted hover:text-text-primary bg-bg-card border border-border rounded-full px-2.5 py-1 transition-colors">
+                  <Upload className="h-3 w-3" /> Upload
+                </Link>
+              )}
             </div>
           </header>
 
@@ -599,21 +626,25 @@ export default function ChatPage() {
               </div>
             ) : messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full py-20 text-center">
-                <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10 border border-accent/20">
-                  <Sparkles className="h-8 w-8 text-accent" />
+                <div className={`mb-6 flex h-16 w-16 items-center justify-center rounded-2xl ${
+                  chatMode === 'general' ? 'bg-purple-500/10 border border-purple-500/20' : 'bg-accent/10 border border-accent/20'
+                }`}>
+                  {chatMode === 'general'
+                    ? <Globe className="h-8 w-8 text-purple-400" />
+                    : <Sparkles className="h-8 w-8 text-accent" />
+                  }
                 </div>
-                <h2 className="mb-2 text-xl font-bold">Ask anything about your documents</h2>
+                <h2 className="mb-2 text-xl font-bold">
+                  {chatMode === 'general' ? 'General AI Assistant' : 'Ask your documents'}
+                </h2>
                 <p className="mb-8 max-w-md text-sm text-text-secondary leading-relaxed">
-                  Upload PDFs, Markdown, code, or any text file. DocuMind finds the most relevant
-                  passages and answers your questions with cited sources.
+                  {chatMode === 'general'
+                    ? 'Ask me anything — coding, writing, analysis, maths, or just a quick question. I have full context of our conversation.'
+                    : 'Upload PDFs, Markdown, code, or any text file. DocuMind finds the most relevant passages and answers with cited sources.'
+                  }
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2 w-full max-w-lg">
-                  {[
-                    'What are the key findings?',
-                    'Summarize the main points',
-                    'What are the payment terms?',
-                    'List all action items',
-                  ].map(prompt => (
+                  {emptyPrompts.map(prompt => (
                     <button
                       key={prompt}
                       onClick={() => { setInput(prompt); textareaRef.current?.focus(); }}
@@ -623,7 +654,7 @@ export default function ChatPage() {
                     </button>
                   ))}
                 </div>
-                {collections.length === 0 && (
+                {chatMode === 'documents' && collections.length === 0 && (
                   <Link
                     href="/documents"
                     className="mt-6 inline-flex items-center gap-2 rounded-xl border border-accent/25 bg-accent/8 px-4 py-2.5 text-sm text-accent hover:bg-accent/15 transition-colors"
@@ -647,26 +678,35 @@ export default function ChatPage() {
           {/* Composer */}
           <div className="border-t border-border bg-bg-primary/80 backdrop-blur px-4 py-3 pb-safe-area shrink-0">
             <div className="mx-auto max-w-3xl">
-              <div className="flex items-end gap-2 rounded-2xl border border-border bg-bg-card p-2 focus-within:border-accent/50 transition-colors">
-                <Link
-                  href="/documents"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-bg-hover hover:text-text-primary transition-colors"
-                  title="Upload documents"
-                >
-                  <Upload className="h-4 w-4" />
-                </Link>
+              <div className={`flex items-end gap-2 rounded-2xl border p-2 focus-within:border-accent/50 transition-colors ${
+                chatMode === 'general' ? 'border-purple-500/20 bg-bg-card' : 'border-border bg-bg-card'
+              }`}>
+                {chatMode === 'documents' && (
+                  <Link
+                    href="/documents"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-bg-hover hover:text-text-primary transition-colors"
+                    title="Upload documents"
+                  >
+                    <Upload className="h-4 w-4" />
+                  </Link>
+                )}
+                {chatMode === 'general' && (
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-400" title="General AI mode">
+                    <Globe className="h-4 w-4" />
+                  </div>
+                )}
 
                 <textarea
                   ref={textareaRef}
                   value={input}
                   onChange={e => { setInput(e.target.value); resizeTextarea(); }}
                   onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      sendMessage();
-                    }
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
                   }}
-                  placeholder="Ask anything about your documents…"
+                  placeholder={chatMode === 'general'
+                    ? 'Ask me anything — code, writing, analysis, maths…'
+                    : 'Ask anything about your documents…'
+                  }
                   rows={1}
                   className="flex-1 resize-none bg-transparent py-1.5 text-sm text-text-primary placeholder:text-text-muted outline-none leading-relaxed min-h-[36px] max-h-[200px]"
                 />
@@ -683,7 +723,9 @@ export default function ChatPage() {
                   <button
                     onClick={sendMessage}
                     disabled={!input.trim()}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent text-white disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-white disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-opacity ${
+                      chatMode === 'general' ? 'bg-purple-500' : 'bg-accent'
+                    }`}
                     title="Send (Enter)"
                   >
                     <ArrowUp className="h-4 w-4" />
@@ -691,14 +733,19 @@ export default function ChatPage() {
                 )}
               </div>
               <p className="mt-1.5 text-center text-[10px] text-text-muted">
-                DocuMind generates answers from your indexed documents ·{' '}
-                <Link href="/documents" className="hover:text-text-secondary transition-colors">Add documents</Link>
-                {' · '}
-                <Link href="/search" className="hover:text-text-secondary transition-colors">Semantic search</Link>
+                {chatMode === 'general'
+                  ? 'General AI mode · Answers are not grounded in your documents'
+                  : <>
+                      Document mode · Answers cite your indexed files ·{' '}
+                      <Link href="/documents" className="hover:text-text-secondary transition-colors">Add documents</Link>
+                    </>
+                }
               </p>
             </div>
           </div>
         </div>
+
+
       </div>
     </AuthGate>
   );

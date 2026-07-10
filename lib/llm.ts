@@ -1,19 +1,21 @@
 // OpenAI-compatible chat client with streaming support (Gemini by default).
+// Supports two modes:
+//   • "documents"  — grounded RAG answers citing retrieved passages
+//   • "general"    — direct LLM chat with no document context required
 //
-// Returns a ReadableStream of text tokens so the chat UI can render answers as
-// they generate. Falls back to a helpful message when no API key is
-// configured, and never leaks raw provider error bodies or key material to
-// the client.
+// Returns a ReadableStream of text tokens so the chat UI renders answers live.
 
 import { Citation } from './types';
 
-const API_KEY = process.env.LLM_API_KEY;
-const BASE_URL = process.env.LLM_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai';
+const API_KEY    = process.env.LLM_API_KEY;
+const BASE_URL   = process.env.LLM_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai';
 const CHAT_MODEL = process.env.LLM_CHAT_MODEL || 'gemini-2.5-flash';
 
 export function llmConfigured(): boolean {
   return Boolean(API_KEY);
 }
+
+// ─── Document-grounded mode ───────────────────────────────────────────────────
 
 /** Build the grounded system + user prompt from retrieved citations. */
 export function buildMessages(question: string, citations: Citation[]) {
@@ -33,7 +35,7 @@ export function buildMessages(question: string, citations: Citation[]) {
         'You are DocuMind, an intelligent document assistant.',
         'No relevant passages were found for this question in the indexed documents.',
         'Politely let the user know their documents do not contain an answer to this question.',
-        'Suggest they upload relevant documents, or rephrase their question.',
+        'Suggest they upload relevant documents or rephrase their question.',
         'Never make up document content. Be brief and helpful.',
       ].join(' ');
 
@@ -43,20 +45,47 @@ export function buildMessages(question: string, citations: Citation[]) {
 
   return [
     { role: 'system' as const, content: system },
-    { role: 'user' as const, content: user },
+    { role: 'user'   as const, content: user   },
   ];
 }
 
+// ─── General AI mode ─────────────────────────────────────────────────────────
+
+export type GeneralMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+/**
+ * Build messages for a free-form AI conversation (no document context).
+ * Includes full history so the LLM can follow multi-turn threads.
+ */
+export function buildGeneralMessages(
+  question: string,
+  history: GeneralMessage[] = [],
+) {
+  const system = [
+    'You are DocuMind AI, a highly capable general-purpose assistant built into the DocuMind platform.',
+    'You can answer any question, help with writing, analysis, coding, maths, brainstorming, or creative tasks.',
+    'When the user mentions "my documents" or asks about content they uploaded, remind them to switch to Document Mode',
+    'using the toggle at the top of the chat.',
+    'Be friendly, concise, and use markdown formatting (lists, code blocks, headings) when it improves clarity.',
+    'Never mention that you are based on a specific underlying model.',
+  ].join(' ');
+
+  return [
+    { role: 'system' as const, content: system },
+    ...history.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+    { role: 'user'   as const, content: question },
+  ];
+}
+
+// ─── Shared streaming engine ──────────────────────────────────────────────────
+
 function friendlyUpstreamMessage(status: number): string {
-  if (status === 429) {
-    return 'The AI is receiving too many requests right now. Please wait a minute and try again.';
-  }
-  if (status === 401 || status === 403) {
-    return 'The AI answer service is not available right now. Retrieval and citations below still work.';
-  }
-  if (status >= 500) {
-    return 'The AI answer service is temporarily unavailable. Please try again shortly.';
-  }
+  if (status === 429) return 'The AI is rate-limited right now. Please wait a minute and try again.';
+  if (status === 401 || status === 403) return 'The AI key is invalid or missing. Go to Settings → AI Engine to configure it.';
+  if (status >= 500) return 'The AI provider is temporarily unavailable. Please try again shortly.';
   return 'The AI could not generate an answer for this question. Please rephrase and try again.';
 }
 
@@ -69,14 +98,13 @@ export async function streamChat(
   if (!API_KEY) {
     return new ReadableStream({
       start(controller) {
-        controller.enqueue(
-          encoder.encode(
-            '**AI answers are not configured yet.**\n\n' +
-            'To enable answers, add your `LLM_API_KEY` environment variable (Gemini, OpenAI, or any OpenAI-compatible provider).\n\n' +
-            'See the **README** or go to **Settings → AI Engine** for setup instructions.\n\n' +
-            '_Tip: Document upload and semantic search still work without an AI key._',
-          ),
-        );
+        controller.enqueue(encoder.encode(
+          '**AI answers are not configured yet.**\n\n' +
+          'Add your `LLM_API_KEY` in Vercel → Settings → Environment Variables ' +
+          '(Gemini, OpenAI, Groq, or any OpenAI-compatible provider).\n\n' +
+          'Then redeploy so the key is picked up.\n\n' +
+          '_Document upload and semantic search still work without an AI key._',
+        ));
         controller.close();
       },
     });
@@ -86,16 +114,13 @@ export async function streamChat(
   try {
     upstream = await fetch(`${BASE_URL}/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${API_KEY}`,
-      },
-      body: JSON.stringify({ model: CHAT_MODEL, messages, stream: true, temperature: 0.2 }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
+      body: JSON.stringify({ model: CHAT_MODEL, messages, stream: true, temperature: 0.3 }),
     });
   } catch {
     return new ReadableStream({
       start(controller) {
-        controller.enqueue(encoder.encode('Could not reach the AI service. Please check your connection and try again.'));
+        controller.enqueue(encoder.encode('Could not reach the AI service. Check your connection and try again.'));
         controller.close();
       },
     });
@@ -111,13 +136,12 @@ export async function streamChat(
     });
   }
 
-  // Parse the provider's SSE stream and re-emit only the text deltas.
-  const reader = upstream.body.getReader();
+  const reader  = upstream.body.getReader();
   const decoder = new TextDecoder();
 
   return new ReadableStream({
     async start(controller) {
-      let buffer = '';
+      let buffer  = '';
       let emitted = false;
       try {
         for (;;) {
@@ -132,29 +156,19 @@ export async function streamChat(
             const trimmed = line.trim();
             if (!trimmed.startsWith('data:')) continue;
             const payload = trimmed.slice(5).trim();
-            if (payload === '[DONE]') {
-              controller.close();
-              return;
-            }
+            if (payload === '[DONE]') { controller.close(); return; }
             try {
-              const json = JSON.parse(payload);
+              const json  = JSON.parse(payload);
               const token = json.choices?.[0]?.delta?.content;
-              if (token) {
-                emitted = true;
-                controller.enqueue(encoder.encode(token));
-              }
-            } catch {
-              // ignore keep-alive / non-JSON lines
-            }
+              if (token) { emitted = true; controller.enqueue(encoder.encode(token)); }
+            } catch { /* non-JSON keep-alive lines */ }
           }
         }
         if (!emitted) {
-          controller.enqueue(encoder.encode('The AI returned an empty response. Please try rephrasing your question.'));
+          controller.enqueue(encoder.encode('The AI returned an empty response. Please try rephrasing.'));
         }
       } catch {
-        if (!emitted) {
-          controller.enqueue(encoder.encode('The AI connection was interrupted. Please try again.'));
-        }
+        if (!emitted) controller.enqueue(encoder.encode('The AI connection was interrupted. Please try again.'));
       } finally {
         controller.close();
       }

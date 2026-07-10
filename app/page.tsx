@@ -3,57 +3,86 @@ import {
   ArrowRight, Bot, FileText, Layers, MessageSquare,
   Search, Shield, Zap, BarChart2, Code2, Globe,
   CheckCircle2, Download, FolderOpen, Lock, Server,
-  Sparkles, ChevronRight, Upload, Star,
+  Sparkles, ChevronRight, Upload, Star, BookOpen,
+  Terminal, Database,
 } from 'lucide-react';
+import FAQ from '@/components/landing/FAQ';
 
 const FEATURES = [
-  { icon: Zap, title: 'Instant RAG pipeline', desc: 'Upload any file. DocuMind chunks, embeds with ada-002, and stores in pgvector — ready for semantic search in seconds.', color: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20' },
-  { icon: MessageSquare, title: 'Cited AI answers', desc: 'Every response shows exactly which document and chunk it came from, with a relevance score you can inspect.', color: 'text-accent bg-accent/10 border-accent/20' },
-  { icon: Layers, title: 'Session memory', desc: 'Chat sessions persist across reloads. Rename, browse history, and revisit past conversations.', color: 'text-purple-400 bg-purple-400/10 border-purple-400/20' },
-  { icon: Search, title: 'Semantic search', desc: 'Vector similarity search finds the right passage even when keywords don\'t match — understands meaning.', color: 'text-blue-400 bg-blue-400/10 border-blue-400/20' },
-  { icon: FolderOpen, title: 'Collections', desc: 'Organise documents into namespaced collections. Scope chat and search to a single collection.', color: 'text-green-400 bg-green-400/10 border-green-400/20' },
-  { icon: BarChart2, title: 'Analytics dashboard', desc: 'Track upload velocity, index health, chunk counts, and per-collection storage usage in real time.', color: 'text-orange-400 bg-orange-400/10 border-orange-400/20' },
-  { icon: Download, title: 'Export center', desc: 'Download your documents, chunks, or chat history as JSON, CSV, Markdown, or JSONL for LLM fine-tuning.', color: 'text-pink-400 bg-pink-400/10 border-pink-400/20' },
-  { icon: Code2, title: 'OpenAI-compatible', desc: 'Plug in any OpenAI-compatible provider — OpenAI, Groq, Ollama, Together, or your own endpoint.', color: 'text-teal-400 bg-teal-400/10 border-teal-400/20' },
-  { icon: Lock, title: 'Self-hostable', desc: 'Runs on Vercel + Neon with zero vendor lock-in. Your data stays in your own database.', color: 'text-red-400 bg-red-400/10 border-red-400/20' },
+  { icon: Zap,          title: 'Instant RAG pipeline',   desc: 'Upload any file. DocuMind chunks, embeds with ada-002, and stores in pgvector — ready for semantic search in seconds.',      color: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20' },
+  { icon: MessageSquare,title: 'Cited AI answers',        desc: 'Every response shows exactly which document and chunk it came from, with a relevance score you can inspect.',                  color: 'text-accent bg-accent/10 border-accent/20' },
+  { icon: Globe,        title: 'General AI mode',         desc: 'Toggle between Document mode (RAG) and General AI mode for free-form conversation — no documents required.',                   color: 'text-purple-400 bg-purple-400/10 border-purple-400/20' },
+  { icon: Layers,       title: 'Session memory',          desc: 'Chat sessions persist across reloads. Rename, browse history, and revisit past conversations.',                                 color: 'text-purple-400 bg-purple-400/10 border-purple-400/20' },
+  { icon: Search,       title: 'Semantic search',         desc: 'Vector similarity search finds the right passage even when keywords don\'t match — understands meaning.',                       color: 'text-blue-400 bg-blue-400/10 border-blue-400/20' },
+  { icon: FolderOpen,   title: 'Collections',             desc: 'Organise documents into namespaced collections. Scope chat and search to a single collection.',                                 color: 'text-green-400 bg-green-400/10 border-green-400/20' },
+  { icon: BarChart2,    title: 'Analytics dashboard',     desc: 'Track upload velocity, index health, chunk counts, and per-collection storage usage in real time.',                            color: 'text-orange-400 bg-orange-400/10 border-orange-400/20' },
+  { icon: Download,     title: 'Export center',           desc: 'Download your documents, chunks, or chat history as JSON, CSV, Markdown, or JSONL for LLM fine-tuning.',                       color: 'text-pink-400 bg-pink-400/10 border-pink-400/20' },
+  { icon: Code2,        title: 'OpenAI-compatible',       desc: 'Plug in any OpenAI-compatible provider — OpenAI, Groq, Ollama, Together, or your own endpoint.',                               color: 'text-teal-400 bg-teal-400/10 border-teal-400/20' },
+  { icon: Lock,         title: 'Self-hostable',           desc: 'Runs on Vercel + Neon with zero vendor lock-in. Your data stays in your own database.',                                         color: 'text-red-400 bg-red-400/10 border-red-400/20' },
 ];
 
 const STEPS = [
-  { n: '01', title: 'Upload documents', desc: 'PDF, Markdown, TXT, CSV, code, JSON — drag-and-drop up to 15 MB. DocuMind splits into chunks and generates embeddings automatically.' },
-  { n: '02', title: 'Ask questions', desc: 'Type any question in natural language. The AI retrieves the most relevant passages with cosine similarity, then drafts a cited answer.' },
-  { n: '03', title: 'Explore & export', desc: 'Search semantically, browse analytics, manage collections, and export everything for ML pipelines or backups.' },
+  { n: '01', title: 'Upload documents',  desc: 'PDF, Markdown, TXT, CSV, code, JSON — drag-and-drop up to 15 MB. DocuMind splits into chunks and generates embeddings automatically.' },
+  { n: '02', title: 'Ask questions',     desc: 'Type any question in natural language. The AI retrieves the most relevant passages with cosine similarity, then drafts a cited answer.' },
+  { n: '03', title: 'Explore & export',  desc: 'Search semantically, browse analytics, manage collections, and export everything for ML pipelines or backups.' },
 ];
 
 const FORMATS = ['PDF', 'MD', 'TXT', 'CSV', 'JSON', 'JS/TS', 'Python', 'YAML', 'SQL', 'HTML', 'XML', 'LOG'];
 
+const USE_CASES = [
+  {
+    icon: BookOpen,
+    title: 'Research & academia',
+    color: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
+    steps: [
+      'Upload research papers, theses, and datasets',
+      'Ask "What methodology did Smith et al. use?"',
+      'Get cited answers tracing back to exact pages',
+      'Export structured summaries for literature reviews',
+    ],
+  },
+  {
+    icon: FileText,
+    title: 'Legal & contracts',
+    color: 'text-green-400 bg-green-400/10 border-green-400/20',
+    steps: [
+      'Upload contracts, NDAs, and compliance docs',
+      'Ask "What are the termination clauses?"',
+      'Semantic search surfaces relevant clauses instantly',
+      'Scope queries to individual contract collections',
+    ],
+  },
+  {
+    icon: Terminal,
+    title: 'Developer knowledge base',
+    color: 'text-purple-400 bg-purple-400/10 border-purple-400/20',
+    steps: [
+      'Index your codebase, READMEs, and API docs',
+      'Ask "How does the auth middleware work?"',
+      'Get code-aware answers with chunk previews',
+      'Sync new docs with the collection auto-refresh',
+    ],
+  },
+  {
+    icon: Database,
+    title: 'Business intelligence',
+    color: 'text-orange-400 bg-orange-400/10 border-orange-400/20',
+    steps: [
+      'Upload reports, CSV datasets, and meeting notes',
+      'Ask "What were Q3 key risks?"',
+      'Switch to General AI for open-ended analysis',
+      'Export chat history as JSONL for LLM fine-tuning',
+    ],
+  },
+];
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
+      {/* Navigation.tsx is injected by layout.tsx — no duplicate nav here */}
 
-      {/* Nav */}
-      <nav className="sticky top-0 z-40 border-b border-border/50 bg-bg-primary/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-2 text-white shadow-lg shadow-accent/25">
-              <Bot className="h-4 w-4" />
-            </div>
-            <span className="text-lg font-bold tracking-tight">DocuMind</span>
-            <span className="hidden sm:inline-block text-[10px] font-mono font-bold text-text-muted border border-border/60 rounded px-1.5 py-0.5">v6.0</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <Link href="/auth?mode=login" className="rounded-xl px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors">
-              Sign in
-            </Link>
-            <Link href="/auth?mode=signup" className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity shadow-sm shadow-accent/30">
-              Get started free
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      {/* Hero */}
-      <section className="relative overflow-hidden py-24 sm:py-32">
-        {/* BG glow */}
+      {/* Hero — pt-20 offsets the sticky nav from Navigation.tsx */}
+      <section className="relative overflow-hidden pt-20 pb-24 sm:pb-32">
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="h-[600px] w-[600px] rounded-full bg-accent/5 blur-[120px]" />
         </div>
@@ -87,7 +116,6 @@ export default function LandingPage() {
       <section className="py-8 pb-24">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
           <div className="glass rounded-2xl overflow-hidden shadow-2xl shadow-black/30 border border-border/60">
-            {/* Terminal header */}
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border/50 bg-bg-secondary/50">
               <div className="flex gap-1.5">
                 <span className="h-3 w-3 rounded-full bg-red-400/70" />
@@ -97,7 +125,6 @@ export default function LandingPage() {
               <span className="flex-1 text-center text-xs font-mono text-text-muted">DocuMind Chat</span>
               <Bot className="h-3.5 w-3.5 text-accent" />
             </div>
-            {/* Demo messages */}
             <div className="px-6 py-6 space-y-5 bg-bg-primary/50">
               <div className="flex justify-end">
                 <div className="max-w-xs rounded-2xl rounded-tr-sm bg-accent px-4 py-3 text-sm text-white">
@@ -113,7 +140,7 @@ export default function LandingPage() {
                   <ol className="mt-2 space-y-1 pl-4 list-decimal text-text-secondary">
                     <li>Supply chain disruption in Q3 <sup className="text-accent font-bold">[1]</sup></li>
                     <li>Regulatory compliance gaps in APAC markets <sup className="text-accent font-bold">[2]</sup></li>
-                    <li>Talent retention in R&amp;D divisions <sup className="text-accent font-bold">[3]</sup></li>
+                    <li>Talent retention in R&D divisions <sup className="text-accent font-bold">[3]</sup></li>
                   </ol>
                   <div className="mt-3 space-y-1.5">
                     {[
@@ -131,7 +158,6 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-            {/* Composer hint */}
             <div className="flex items-center gap-2 px-4 py-3 border-t border-border/50 bg-bg-secondary/30">
               <span className="flex-1 text-sm text-text-muted pl-2">Ask anything about your documents…</span>
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-white">
@@ -143,7 +169,7 @@ export default function LandingPage() {
       </section>
 
       {/* How it works */}
-      <section className="py-20 border-t border-border/30">
+      <section id="how" className="py-20 border-t border-border/30 scroll-mt-20">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
             <h2 className="text-3xl font-bold">How it works</h2>
@@ -177,7 +203,7 @@ export default function LandingPage() {
       </section>
 
       {/* Features grid */}
-      <section className="py-24 border-t border-border/30">
+      <section id="features" className="py-24 border-t border-border/30 scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
             <h2 className="text-3xl font-bold">Everything you need</h2>
@@ -193,6 +219,67 @@ export default function LandingPage() {
                 <p className="text-sm text-text-secondary leading-relaxed">{desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Use Cases — id="guide" matches Navigation.tsx anchor */}
+      <section id="guide" className="py-24 border-t border-border/30 scroll-mt-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent/8 px-4 py-1.5 text-xs font-semibold text-accent mb-5">
+              <Star className="h-3.5 w-3.5" /> Use cases
+            </div>
+            <h2 className="text-3xl font-bold">Built for every knowledge workflow</h2>
+            <p className="mt-3 text-text-secondary max-w-xl mx-auto">
+              From legal contracts to developer docs — DocuMind adapts to how your team works with information.
+            </p>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2">
+            {USE_CASES.map(({ icon: Icon, title, color, steps }) => (
+              <div key={title} className="glass rounded-2xl p-6 group hover:border-accent/20 transition-colors">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${color}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-bold text-base">{title}</h3>
+                </div>
+                <ol className="space-y-2.5">
+                  {steps.map((step, i) => (
+                    <li key={i} className="flex items-start gap-3 text-sm text-text-secondary">
+                      <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
+                      {step}
+                    </li>
+                  ))}
+                </ol>
+                <Link
+                  href="/auth?mode=signup"
+                  className="mt-5 inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline"
+                >
+                  Try this workflow <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ — id="faq" matches Navigation.tsx anchor */}
+      <section id="faq" className="py-24 border-t border-border/30 scroll-mt-20">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold">Frequently asked questions</h2>
+            <p className="mt-3 text-text-secondary">Everything you need to know before deploying</p>
+          </div>
+          <FAQ />
+          <div className="mt-10 text-center">
+            <p className="text-sm text-text-secondary mb-4">Still have questions?</p>
+            <Link
+              href="/help"
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-bg-card px-5 py-2.5 text-sm font-medium text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors"
+            >
+              Read the full guide <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       </section>
@@ -233,7 +320,7 @@ export default function LandingPage() {
                 <Bot className="h-3.5 w-3.5" />
               </div>
               <span className="font-bold text-sm">DocuMind</span>
-              <span className="text-xs text-text-muted">v6.0</span>
+              <span className="text-xs text-text-muted">v7.0</span>
             </div>
             <p className="text-xs text-text-muted">
               Built with Next.js · pgvector · OpenAI — Deployed on Vercel

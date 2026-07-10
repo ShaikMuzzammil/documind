@@ -26,13 +26,23 @@ class IngestError extends Error {
 }
 
 async function parsePdf(buffer: Buffer): Promise<string> {
-  // Load pdf-parse directly from its lib file to bypass the index.js test-runner
-  // that tries to load non-existent test PDFs in serverless environments.
+  // Use the aliased pdf-parse that points to lib/pdf-parse.js (set in next.config.js).
+  // This bypasses the root index.js which tries to load test PDFs at require-time —
+  // a known cause of "Failed to load external module" errors on Vercel.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require('pdf-parse/lib/pdf-parse.js') as (buf: Buffer, opts?: object) => Promise<{ text: string; numpages: number }>;
+  const pdfParse = require('pdf-parse') as (
+    buf: Buffer,
+    opts?: object,
+  ) => Promise<{ text: string; numpages: number }>;
+
   const data = await pdfParse(buffer, { max: 0 });
   const text = (data.text || '').trim();
-  if (!text) throw new Error('No text layer found — file may be a scanned image PDF. Run OCR first.');
+  if (!text) {
+    throw new Error(
+      'No text layer found. This PDF may be scanned (image-only). ' +
+      'Run OCR first to add a text layer before uploading.',
+    );
+  }
   return text;
 }
 

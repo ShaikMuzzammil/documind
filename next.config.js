@@ -2,22 +2,36 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  // Next.js 16 uses Turbopack by default.
-  // serverExternalPackages is the Turbopack-compatible way to keep
-  // native Node.js packages (pdf-parse, bcryptjs, pg) out of the bundle.
-  // We list both the package root AND the lib sub-path we require() directly.
-  serverExternalPackages: ['pdf-parse', 'pdf-parse/lib/pdf-parse.js', 'bcryptjs', 'pg'],
+  // Keep only packages that truly need native Node.js bindings.
+  // pdf-parse is intentionally EXCLUDED here — it must be bundled inline
+  // by webpack/Turbopack so the alias below can redirect it to the lib
+  // entry that doesn't execute test-runner code on import (the root
+  // index.js loads test PDFs at require-time, which fails on Vercel).
+  serverExternalPackages: ['bcryptjs', 'pg'],
 
-  // Empty turbopack config silences the "webpack config present but no turbopack config" error
-  turbopack: {},
+  // Turbopack alias (Next.js 16 production builds on Vercel)
+  turbopack: {
+    resolveAlias: {
+      'pdf-parse': './node_modules/pdf-parse/lib/pdf-parse.js',
+    },
+  },
+
+  // Webpack alias (fallback / local dev)
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'pdf-parse': require.resolve('pdf-parse/lib/pdf-parse.js'),
+    };
+    return config;
+  },
 
   async headers() {
     return [{
       source: '/:path*',
       headers: [
-        { key: 'X-Frame-Options',        value: 'DENY' },
-        { key: 'X-Content-Type-Options',  value: 'nosniff' },
-        { key: 'Referrer-Policy',         value: 'strict-origin-when-cross-origin' },
+        { key: 'X-Frame-Options',       value: 'DENY' },
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'Referrer-Policy',        value: 'strict-origin-when-cross-origin' },
       ],
     }];
   },

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   ChevronDown, FolderPlus, MessageSquare, Search, Upload,
   Zap, Shield, Key, BookOpen, ExternalLink, CheckCircle2,
-  Github, Mail, User, Bug, AlertTriangle,
+  Mail, Bug, AlertTriangle,
 } from 'lucide-react';
 import AuthGate from '@/components/app/AuthGate';
 
@@ -200,47 +200,21 @@ export default function HelpPage() {
             <p className="mt-1 text-sm text-text-secondary">Step-by-step walkthroughs to get the most out of DocuMind.</p>
           </div>
 
-          {/* Contact / GitHub — MOVED TO TOP */}
+          {/* Support card */}
           <div className="glass rounded-2xl p-5 space-y-3">
-            <p className="text-xs font-bold tracking-widest text-text-muted">DEVELOPER & CONTACT</p>
-            <div className="grid sm:grid-cols-3 gap-3">
-              <a href="https://github.com/ShaikMuzzammil" target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-3 rounded-xl border border-border bg-bg-card/60 px-4 py-3 hover:border-accent/30 hover:bg-accent/5 transition-all group"
-              >
-                <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
-                  <Github className="h-4 w-4 text-accent" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">GitHub</p>
-                  <p className="text-xs text-text-muted">ShaikMuzzammil</p>
-                </div>
-                <ExternalLink className="h-3.5 w-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
-              </a>
-              <a href="https://shaikmuzzammil.vercel.app" target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-3 rounded-xl border border-border bg-bg-card/60 px-4 py-3 hover:border-accent/30 hover:bg-accent/5 transition-all group"
-              >
-                <div className="w-9 h-9 rounded-xl bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center">
-                  <User className="h-4 w-4 text-cyan-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">Portfolio</p>
-                  <p className="text-xs text-text-muted">shaikmuzzammil.vercel.app</p>
-                </div>
-                <ExternalLink className="h-3.5 w-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
-              </a>
-              <a href="https://github.com/ShaikMuzzammil/documind/issues/new" target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-3 rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 hover:border-danger/40 hover:bg-danger/10 transition-all group"
-              >
-                <div className="w-9 h-9 rounded-xl bg-danger/10 border border-danger/20 flex items-center justify-center">
-                  <Bug className="h-4 w-4 text-danger" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">Report Bug</p>
-                  <p className="text-xs text-text-muted">Open a GitHub issue</p>
-                </div>
-                <ExternalLink className="h-3.5 w-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
-              </a>
-            </div>
+            <p className="text-xs font-bold tracking-widest text-text-muted">SUPPORT</p>
+            <a href="https://github.com/ShaikMuzzammil/documind/issues/new" target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 hover:border-danger/40 hover:bg-danger/10 transition-all group"
+            >
+              <div className="w-9 h-9 rounded-xl bg-danger/10 border border-danger/20 flex items-center justify-center">
+                <Bug className="h-4 w-4 text-danger" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Report a Bug</p>
+                <p className="text-xs text-text-muted">Open a GitHub issue — include steps to reproduce</p>
+              </div>
+              <ExternalLink className="h-3.5 w-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+            </a>
           </div>
 
           {/* Quick nav */}
@@ -306,15 +280,14 @@ export default function HelpPage() {
             </div>
           </section>
 
-          {/* Footer link */}
+          {/* Footer note */}
           <div className="glass rounded-xl p-4 flex items-center gap-3 text-sm">
-            <Mail className="h-4 w-4 text-accent shrink-0" />
-            <span className="text-text-secondary">Questions or collaboration?</span>
-            <a href="https://shaikmuzzammil.vercel.app" target="_blank" rel="noopener noreferrer"
-              className="ml-auto text-accent hover:underline font-medium shrink-0"
-            >
-              Visit Portfolio →
-            </a>
+            <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+            <span className="text-text-secondary">
+              If the AI indicator shows <strong className="text-warning">Configure AI</strong>, add your{' '}
+              <code className="text-[11px] bg-bg-secondary/80 border border-border rounded px-1">LLM_API_KEY</code>{' '}
+              in Vercel environment variables and redeploy.
+            </span>
           </div>
         </div>
       </div>
