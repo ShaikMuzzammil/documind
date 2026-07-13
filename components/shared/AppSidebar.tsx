@@ -87,7 +87,7 @@ export default function AppSidebar() {
               </div>
               <div className="min-w-0">
                 <span className="text-sm font-bold tracking-tight">DocuMind</span>
-                <span className="ml-1.5 text-[9px] font-mono font-bold text-text-muted border border-border/60 rounded px-1 py-px">v6</span>
+                <span className="ml-1.5 text-[9px] font-mono font-bold text-text-muted border border-border/60 rounded px-1 py-px">v8</span>
               </div>
             </Link>
             {/* Collapse button — always visible (was broken: opacity-0 with no parent group class) */}

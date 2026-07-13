@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -15,20 +15,21 @@ const HOME_SECTIONS = [
   { id: 'faq',      label: 'FAQ' },
 ];
 
-// Pages that render their own sidebar branding — Navigation hides on these
+// App pages have their own sidebar branding — Navigation hides on these
 const APP_PATHS = [
   '/chat', '/documents', '/collections', '/analytics',
   '/export', '/search', '/help', '/settings', '/profile',
 ];
 
 export default function Navigation() {
-  const pathname = usePathname() || '/';
-  const isApp = APP_PATHS.some((p) => pathname.startsWith(p));
-  const isHome = pathname === '/';
-  const [scrolled, setScrolled] = useState(false);
-  const [active, setActive] = useState('how');
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, loading, refresh } = useUser();
+  const pathname    = usePathname() || '/';
+  const isApp       = APP_PATHS.some((p) => pathname.startsWith(p));
+  const isHome      = pathname === '/';
+  const [scrolled,    setScrolled]    = useState(false);
+  const [active,      setActive]      = useState('how');
+  const [mobileOpen,  setMobileOpen]  = useState(false);
+  const { user, loading, refresh }    = useUser();
+  const rafRef = useRef<number>(0);
 
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -36,32 +37,50 @@ export default function Navigation() {
     window.location.href = '/';
   };
 
+  // Scroll → glass nav
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Scroll-position based active section detection (reliable on all browsers)
   useEffect(() => {
     if (!isHome) return;
-    const sections = HOME_SECTIONS.map((s) => document.getElementById(s.id)).filter(
-      (el): el is HTMLElement => Boolean(el),
-    );
-    if (!sections.length) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (visible?.target.id) setActive(visible.target.id);
-      },
-      { rootMargin: '-30% 0px -55% 0px', threshold: [0.15, 0.4, 0.7] },
-    );
-    sections.forEach((s) => observer.observe(s));
-    return () => observer.disconnect();
+
+    const update = () => {
+      // Use 40% from top of viewport as the "active" threshold
+      const threshold = window.scrollY + window.innerHeight * 0.4;
+      let found = HOME_SECTIONS[0].id;
+      for (const { id } of HOME_SECTIONS) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        // offsetTop is relative to the nearest positioned ancestor; use getBoundingClientRect for accuracy
+        const top = el.getBoundingClientRect().top + window.scrollY;
+        if (top <= threshold + 80) found = id; // +80 for nav height
+      }
+      setActive(found);
+    };
+
+    const onScroll = () => {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(update);
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    // Kick off initial check after paint
+    const t = setTimeout(update, 100);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(rafRef.current);
+      clearTimeout(t);
+    };
   }, [isHome]);
 
-  // Hide on app pages — the AppSidebar provides the branding there
+  // Close mobile menu on route change
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
+
+  // Hide on app pages — AppSidebar provides branding there
   if (isApp) return null;
 
   return (
@@ -70,13 +89,14 @@ export default function Navigation() {
         initial={{ y: -80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.45, ease: 'easeOut' }}
-        className={`fixed top-0 inset-x-0 z-50 transition-all duration-200 ${
+        className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
           scrolled
             ? 'glass border-b border-border shadow-xl shadow-black/20'
             : 'bg-transparent'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 group shrink-0">
             <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-center transition-colors group-hover:border-accent/50">
@@ -87,20 +107,27 @@ export default function Navigation() {
             </span>
           </Link>
 
-          {/* Desktop nav links */}
+          {/* Desktop nav links — only on home */}
           {isHome && (
             <div className="hidden md:flex items-center gap-0.5">
               {HOME_SECTIONS.map((s) => (
                 <a
                   key={s.id}
                   href={`#${s.id}`}
-                  className={`px-3.5 py-2 text-sm rounded-lg transition-colors ${
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  className={`px-3.5 py-2 text-sm rounded-lg transition-all duration-150 ${
                     active === s.id
-                      ? 'text-accent bg-accent/8 font-medium'
+                      ? 'text-accent bg-accent/8 font-semibold'
                       : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
                   }`}
                 >
                   {s.label}
+                  {active === s.id && (
+                    <span className="block h-0.5 bg-accent rounded-full mt-0.5 mx-auto" style={{ width: '70%' }} />
+                  )}
                 </a>
               ))}
             </div>
@@ -146,10 +173,11 @@ export default function Navigation() {
               </>
             )}
 
-            {/* Mobile menu toggle */}
+            {/* Mobile hamburger */}
             {isHome && (
               <button
                 onClick={() => setMobileOpen((o) => !o)}
+                aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
                 className="md:hidden ml-1 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-bg-card text-text-secondary"
               >
                 {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
@@ -169,12 +197,31 @@ export default function Navigation() {
               <a
                 key={s.id}
                 href={`#${s.id}`}
-                onClick={() => setMobileOpen(false)}
-                className="block rounded-lg px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-white/5 transition-colors"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setMobileOpen(false);
+                  document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className={`flex items-center rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                  active === s.id
+                    ? 'bg-accent/10 text-accent font-medium'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                }`}
               >
                 {s.label}
               </a>
             ))}
+            <div className="pt-2 border-t border-border/40 mt-1">
+              {user ? (
+                <Link href="/chat" className="flex items-center gap-2 rounded-lg bg-accent px-3 py-2.5 text-sm font-semibold text-white">
+                  Go to Workspace <ArrowRight className="h-4 w-4" />
+                </Link>
+              ) : (
+                <Link href="/auth?mode=register" className="flex items-center gap-2 rounded-lg bg-accent px-3 py-2.5 text-sm font-semibold text-white">
+                  Get started free <ArrowRight className="h-4 w-4" />
+                </Link>
+              )}
+            </div>
           </motion.div>
         )}
       </motion.nav>

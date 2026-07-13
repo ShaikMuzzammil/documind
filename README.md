@@ -1,277 +1,371 @@
-# DocuMind v7.0
+<div align="center">
 
-> **Your documents, intelligently answered.**  
-> A production-ready, self-hosted RAG (Retrieval-Augmented Generation) platform built with Next.js 16, pgvector, and any OpenAI-compatible LLM.
+# DocuMind v8.0
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FShaikMuzzammil%2Fdocumind)
+### Intelligent Document Workspace · RAG Platform · Self-Hostable
+
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
+[![pgvector](https://img.shields.io/badge/pgvector-0.7-blue?logo=postgresql)](https://github.com/pgvector/pgvector)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://www.typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-06B6D4?logo=tailwindcss)](https://tailwindcss.com)
+[![Vercel](https://img.shields.io/badge/Deploy-Vercel-black?logo=vercel)](https://vercel.com)
+
+Upload any document. Ask anything. Every answer cited, every source traceable.
+
+[Live Demo](#deploy) · [Quick Start](#quick-start) · [Environment Variables](#environment-variables) · [Architecture](#architecture)
+
+</div>
+
+---
+
+## What is DocuMind?
+
+DocuMind is a production-ready **Retrieval-Augmented Generation (RAG)** platform you can deploy in under 10 minutes. Upload PDFs, Markdown, code, CSV, or any text file — DocuMind chunks and embeds them into a `pgvector` database, then answers questions with inline citations tracing back to the exact source passage.
+
+**Two chat modes:**
+- **Document mode** — RAG with cited answers from your files
+- **General AI mode** — Full-context multi-turn assistant, no documents needed
 
 ---
 
 ## Features
 
-| Feature | Description |
+| Feature | Details |
 |---|---|
-| **RAG pipeline** | Upload → chunk → embed → pgvector, ready in seconds |
-| **Cited answers** | Every AI response traces back to exact source chunks |
-| **General AI mode** | Toggle between doc-grounded answers and free-form AI chat |
-| **Persistent sessions** | Chat history saved per-user with rename/delete |
-| **Semantic search** | Vector cosine similarity — finds meaning, not just keywords |
-| **Collections** | Namespace documents, scope queries per-project |
-| **Analytics dashboard** | Upload velocity, index health, per-collection stats |
-| **Export center** | JSON · CSV · Markdown · JSONL (LLM fine-tuning ready) |
-| **Chunk preview modal** | Browse every text chunk extracted from any document |
-| **OpenAI-compatible** | Gemini, OpenAI, Groq, Ollama, Together — plug-in any provider |
-| **Self-hostable** | Vercel + Neon, zero vendor lock-in, MIT licensed |
+| 📄 **12 file formats** | PDF, MD, TXT, CSV, JSON, JS/TS, Python, YAML, SQL, HTML, XML, LOG |
+| 🤖 **Any OpenAI-compatible LLM** | Gemini, GPT-4o, Groq/Llama, Ollama, Together, Mistral |
+| 🗂️ **Collections** | Namespace docs, scope chat queries per-collection |
+| 💬 **Persistent sessions** | Chat history saved to Postgres, rename/browse |
+| 🔍 **Semantic search** | Cosine-similarity vector search via pgvector |
+| 📊 **Analytics** | Upload velocity, index health, chunk counts, collection breakdown |
+| 📤 **Export center** | JSON / CSV / Markdown / JSONL in one click |
+| 🔐 **HMAC auth** | Signed session tokens, no OAuth dependency |
+| 🌐 **Offline fallback** | Local bag-of-words embedder works without any API key |
+| ☁️ **Self-hostable** | Vercel + Neon free tiers, zero vendor lock-in |
 
 ---
 
-## Quick Start (Vercel + Neon)
+## Quick Start
 
-### 1. Fork & clone
+### 1. Clone & install
 
 ```bash
-git clone https://github.com/ShaikMuzzammil/documind.git
+git clone https://github.com/ShaikMuzzammil/documind
 cd documind
 npm install
 ```
 
-### 2. Create a Neon database
+### 2. Set environment variables
 
-1. Sign up at [neon.tech](https://neon.tech) (free tier works fine)
-2. Create a new project → copy the **connection string** (starts with `postgresql://`)
-3. In the Neon SQL Editor, run:
+Copy `.env.example` to `.env.local`:
 
-```sql
--- Required for vector similarity search
-CREATE EXTENSION IF NOT EXISTS vector;
-
--- Verify it worked
-SELECT * FROM pg_extension WHERE extname = 'vector';
+```bash
+cp .env.example .env.local
 ```
 
-> **If uploads fail with "database error"** — this extension step is the most common missing piece. Do it first.
+Edit `.env.local` with your values (see [Environment Variables](#environment-variables)).
 
-### 3. Set environment variables
-
-Create `.env.local` for local dev (never commit this file):
-
-```env
-# ── Database ──────────────────────────────────────────────────────────────────
-DATABASE_URL=postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
-
-# ── Auth ──────────────────────────────────────────────────────────────────────
-AUTH_SECRET=your-random-32-char-secret     # generate: openssl rand -hex 32
-
-# ── AI / LLM ─────────────────────────────────────────────────────────────────
-# Option A — Google Gemini (free tier, recommended for new users)
-LLM_API_KEY=AIza...
-LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-LLM_CHAT_MODEL=gemini-2.5-flash
-
-# Option B — OpenAI
-LLM_API_KEY=sk-...
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_CHAT_MODEL=gpt-4o-mini
-
-# Option C — Groq (fast inference, generous free tier)
-LLM_API_KEY=gsk_...
-LLM_BASE_URL=https://api.groq.com/openai/v1
-LLM_CHAT_MODEL=llama-3.3-70b-versatile
-
-# Option D — Ollama (local, no cost)
-LLM_API_KEY=ollama
-LLM_BASE_URL=http://localhost:11434/v1
-LLM_CHAT_MODEL=llama3.2
-
-# ── Embeddings ────────────────────────────────────────────────────────────────
-# Uses the same provider as above by default (text-embedding-3-small or equivalent)
-EMBEDDING_API_KEY=      # leave blank to reuse LLM_API_KEY
-EMBEDDING_BASE_URL=     # leave blank to reuse LLM_BASE_URL
-EMBEDDING_MODEL=text-embedding-3-small
-
-# ── Optional: Email (Resend — for future email features) ──────────────────────
-RESEND_API_KEY=re_...
-EMAIL_FROM=noreply@yourdomain.com
-```
-
-### 4. Run locally
+### 3. Run locally
 
 ```bash
 npm run dev
-# Open http://localhost:3000
 ```
 
-### 5. Deploy to Vercel
-
-```bash
-npx vercel --prod
-```
-
-Then in **Vercel → Your Project → Settings → Environment Variables**, add all variables from `.env.local`.
-
-> After adding env vars, always **redeploy** so they take effect.
+Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## Environment Variables Reference
+## Deploy to Vercel
 
-| Variable | Required | Description |
+### Step 1 — Create a Neon Postgres database
+
+1. Go to [neon.tech](https://neon.tech) → **New project**
+2. Copy the **Connection string** (starts with `postgresql://...`)
+3. In your Neon dashboard → **Extensions** → search for **vector** → **Enable**
+
+> ⚠️ Enabling the `vector` extension is required. DocuMind will fail to index documents without it.
+
+### Step 2 — Get an AI provider key
+
+DocuMind works with any OpenAI-compatible provider. Recommended free options:
+
+| Provider | Key URL | Model name | Base URL |
+|---|---|---|---|
+| **Google Gemini** ✅ free | [aistudio.google.com](https://aistudio.google.com/app/apikey) | `gemini-2.5-flash` | `https://generativelanguage.googleapis.com/v1beta/openai` |
+| OpenAI | [platform.openai.com](https://platform.openai.com/api-keys) | `gpt-4o-mini` | *(leave blank)* |
+| Groq | [console.groq.com](https://console.groq.com/keys) | `llama-3.3-70b-versatile` | `https://api.groq.com/openai/v1` |
+| Ollama (local) | — | `llama3.2` | `http://localhost:11434/v1` |
+| Together AI | [api.together.ai](https://api.together.ai/settings/api-keys) | `meta-llama/Llama-3-70b-chat-hf` | `https://api.together.xyz/v1` |
+
+> **Gemini is recommended** for free-tier users — 15 RPM free, no credit card required.
+
+### Step 3 — Deploy to Vercel
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/ShaikMuzzammil/documind)
+
+Or manually:
+
+```bash
+npm i -g vercel
+vercel --prod
+```
+
+### Step 4 — Add environment variables in Vercel
+
+**Vercel Dashboard → Your project → Settings → Environment Variables**
+
+Add all variables from the table below, then **Redeploy**.
+
+---
+
+## Environment Variables
+
+### Required
+
+| Variable | Example | Description |
 |---|---|---|
-| `DATABASE_URL` | ✅ | Neon (or any Postgres) connection string with `?sslmode=require` |
-| `AUTH_SECRET` | ✅ | 32-char random secret for session signing (`openssl rand -hex 32`) |
-| `LLM_API_KEY` | ✅ | API key for your chosen LLM provider |
-| `LLM_BASE_URL` | ✅ | Base URL of OpenAI-compatible API (see examples above) |
-| `LLM_CHAT_MODEL` | ✅ | Model name for chat completions |
-| `EMBEDDING_API_KEY` | ☐ | Defaults to `LLM_API_KEY` if blank |
-| `EMBEDDING_BASE_URL` | ☐ | Defaults to `LLM_BASE_URL` if blank |
-| `EMBEDDING_MODEL` | ☐ | Defaults to `text-embedding-3-small` |
-| `RESEND_API_KEY` | ☐ | For transactional email (optional) |
-| `EMAIL_FROM` | ☐ | Sender address for emails (optional) |
+| `AUTH_SECRET` | `openssl rand -base64 32` output | 32+ char secret for HMAC session signing. **Generate a fresh one — never reuse.** |
+| `DATABASE_URL` | `postgresql://user:pass@host/db?sslmode=require` | Neon (or any Postgres) connection string with pgvector enabled |
+
+### AI Provider (choose one)
+
+| Variable | Example | Description |
+|---|---|---|
+| `LLM_API_KEY` | `AIza...` | API key for your chosen LLM provider |
+| `LLM_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai` | OpenAI-compatible base URL. Omit for OpenAI (uses default). |
+| `LLM_CHAT_MODEL` | `gemini-2.5-flash` | Chat model name. Default: `gemini-2.5-flash` |
+| `LLM_EMBED_MODEL` | `gemini-embedding-001` | Embedding model. Default: `gemini-embedding-001` |
+| `EMBED_DIM` | `768` | Embedding dimensions. Must match your model. Default: `768` |
+
+> **Without `LLM_API_KEY`:** Upload, search, and collection features work via local bag-of-words embeddings. AI chat and citations are disabled.
+
+### Optional
+
+| Variable | Example | Description |
+|---|---|---|
+| `DATABASE_SSL` | `true` | Set to `false` to disable SSL (local Postgres only) |
+
+### `.env.example`
+
+```env
+# ── Required ──────────────────────────────────────────────────────────────────
+AUTH_SECRET=change-me-generate-with-openssl-rand-base64-32
+
+# ── Database (pgvector required) ──────────────────────────────────────────────
+DATABASE_URL=postgresql://username:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require
+
+# ── AI Provider (Gemini example — free tier) ──────────────────────────────────
+LLM_API_KEY=AIzaSy...
+LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+LLM_CHAT_MODEL=gemini-2.5-flash
+LLM_EMBED_MODEL=gemini-embedding-001
+EMBED_DIM=768
+```
 
 ---
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                        Next.js 16                            │
-│  ┌─────────────┐   ┌──────────────┐   ┌──────────────────┐  │
-│  │  /app/chat  │   │ /app/docs    │   │ /app/analytics   │  │
-│  │  (RAG + AI) │   │ (upload UI)  │   │ (insights)       │  │
-│  └──────┬──────┘   └──────┬───────┘   └──────────────────┘  │
-│         │                 │                                   │
-│  ┌──────▼─────────────────▼──────────────────────────────┐   │
-│  │              API Routes (Node.js runtime)              │   │
-│  │  /api/chat   /api/ingest   /api/search   /api/export  │   │
-│  └──────┬───────────────────────────────────────────────┘   │
-│         │                                                     │
-│  ┌──────▼──────────────────────────────────────────────────┐ │
-│  │  lib/                                                    │ │
-│  │  ├── embeddings.ts  → OpenAI-compatible embed API       │ │
-│  │  ├── llm.ts         → streamChat + buildGeneralMessages │ │
-│  │  ├── store.ts       → Postgres / pgvector queries       │ │
-│  │  ├── chunk.ts       → recursive text chunker            │ │
-│  │  └── auth.ts        → HMAC session auth                 │ │
-│  └──────┬───────────────────────────────────────────────────┘ │
-└─────────┼────────────────────────────────────────────────────┘
-          │
-┌─────────▼─────────────────┐
-│  Neon (Postgres + pgvector)│
-│  ├── documents            │
-│  ├── chunks (vector)      │
-│  ├── chat_sessions        │
-│  ├── chat_messages        │
-│  └── collections          │
-└────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                      Next.js 16 App                      │
+│                                                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐  │
+│  │  Landing     │  │  Auth        │  │  App pages    │  │
+│  │  (public)    │  │  (HMAC JWT)  │  │  (protected)  │  │
+│  └──────────────┘  └──────────────┘  └───────────────┘  │
+│                                                         │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │              API Routes (Node.js runtime)         │   │
+│  │  /api/ingest  /api/chat  /api/search              │   │
+│  │  /api/documents  /api/collections  /api/stats     │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                         │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │              lib/ (core logic)                    │   │
+│  │  pdf-extract.ts ──► pdfjs-dist (serverless-safe) │   │
+│  │  embeddings.ts  ──► OpenAI-compat / local fallback│   │
+│  │  llm.ts         ──► streaming SSE                 │   │
+│  │  chunk.ts       ──► 512-token paragraph splitter  │   │
+│  │  auth.ts        ──► HMAC-SHA256 sessions          │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                         │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │           lib/storage/ (adapter pattern)          │   │
+│  │  postgres-adapter.ts  ─── pgvector cosine search  │   │
+│  │  json-adapter.ts      ─── in-memory (no DB setup) │   │
+│  └──────────────────────────────────────────────────┘   │
+└──────────────────────────┬──────────────────────────────┘
+                           │
+              ┌────────────▼──────────────┐
+              │   Neon Postgres + pgvector  │
+              │  users · collections        │
+              │  documents · chunks (vec)   │
+              │  chat_sessions · messages   │
+              └───────────────────────────┘
 ```
 
----
-
-## PDF Upload Troubleshooting
-
-| Error | Cause | Fix |
-|---|---|---|
-| `Indexing failed: A database error occurred` | `pgvector` extension not enabled | Run `CREATE EXTENSION IF NOT EXISTS vector;` in Neon SQL Editor |
-| `Failed to load external module pdf-parse-…` | Vercel bundling issue (v6 and earlier) | **Fixed in v7** — webpack alias routes pdf-parse to its lib file |
-| `Could not read this PDF … scanned` | PDF is image-only (no text layer) | Run OCR first: Adobe Acrobat, `ocrmypdf`, or Google Drive |
-| `No text layer found` | Same as above | Same fix |
-| `File too large` | > 15 MB | Split the PDF or compress before uploading |
-
----
-
-## Chat Modes
-
-**Document Mode** (default)  
-Queries are embedded and matched against your indexed chunks via cosine similarity. Answers cite the exact passages used. If no chunks are found, the AI says so rather than guessing.
-
-**General AI Mode**  
-No document search — direct LLM conversation with full turn-by-turn history. Great for coding help, writing, analysis, or anything not in your documents. Toggle using the pill in the chat header.
-
----
-
-## Adding a New LLM Provider
-
-`LLM_BASE_URL` accepts any OpenAI-compatible endpoint. Examples:
-
-```env
-# Anthropic (via openai-compatible proxy)
-LLM_BASE_URL=https://api.anthropic.com/v1
-LLM_CHAT_MODEL=claude-3-5-haiku-20241022
-
-# Together AI
-LLM_BASE_URL=https://api.together.xyz/v1
-LLM_CHAT_MODEL=meta-llama/Llama-3-8b-chat-hf
-
-# Local Ollama
-LLM_BASE_URL=http://localhost:11434/v1
-LLM_CHAT_MODEL=llama3.2
-LLM_API_KEY=ollama   # any non-empty string
-```
-
----
-
-## Tech Stack
-
-| Layer | Tech |
-|---|---|
-| Framework | Next.js 16 (App Router, Turbopack) |
-| Database | Neon Postgres + `pgvector` extension |
-| Auth | Custom HMAC sessions (`bcryptjs`) |
-| AI / LLM | Any OpenAI-compatible REST API |
-| Embeddings | `text-embedding-3-small` (or equivalent) |
-| PDF parsing | `pdf-parse` (webpack-aliased to lib entry) |
-| Styling | Tailwind CSS v4 + CSS variables |
-| Deployment | Vercel (Edge-compatible pages, Node.js API routes) |
-
----
-
-## Project Structure
+### Project structure
 
 ```
 documind/
 ├── app/
-│   ├── page.tsx              # Landing page (no duplicate nav)
-│   ├── auth/page.tsx         # Login / signup
-│   ├── chat/page.tsx         # Chat with mode toggle
-│   ├── documents/page.tsx    # Upload & manage docs
-│   ├── collections/page.tsx  # Collection management
-│   ├── analytics/page.tsx    # Usage analytics
-│   ├── search/page.tsx       # Semantic search
-│   ├── export/page.tsx       # Data export
-│   ├── help/page.tsx         # Help & guides
-│   ├── settings/page.tsx     # AI & account config
-│   └── api/
-│       ├── chat/route.ts         # Streaming chat (RAG + general)
-│       ├── chat/sessions/        # Session CRUD
-│       ├── ingest/route.ts       # File upload + embedding
-│       ├── documents/route.ts    # Document list
-│       ├── documents/[id]/       # Single doc ops + preview
-│       ├── search/route.ts       # Semantic search
-│       ├── export/route.ts       # Data export
-│       └── auth/                 # Login / logout / me
+│   ├── page.tsx              # Landing page
+│   ├── layout.tsx            # Root layout
+│   ├── auth/                 # Login & register
+│   ├── chat/                 # RAG chat interface
+│   ├── documents/            # Upload & manage
+│   ├── collections/          # Namespace management
+│   ├── analytics/            # Usage dashboard
+│   ├── search/               # Semantic search
+│   ├── export/               # 4-format data export
+│   ├── settings/             # AI engine config
+│   ├── help/                 # User guides
+│   └── api/                  # All API routes
 ├── components/
 │   ├── shared/
-│   │   ├── AppSidebar.tsx    # Collapsible nav (fixed collapse button)
-│   │   └── Navigation.tsx    # Landing page nav
+│   │   ├── Navigation.tsx    # Public nav (hidden on app pages)
+│   │   └── AppSidebar.tsx    # App sidebar (hidden on public pages)
 │   ├── app/
-│   │   ├── AuthGate.tsx      # Route protection
+│   │   ├── AuthGate.tsx      # Redirect wrapper for protected pages
 │   │   └── CollectionPicker.tsx
 │   └── landing/
 │       └── FAQ.tsx
 ├── lib/
-│   ├── llm.ts            # buildMessages + buildGeneralMessages + streamChat
-│   ├── embeddings.ts     # embed() + embedOne()
-│   ├── store.ts          # All DB queries
-│   ├── chunk.ts          # Text chunking
-│   ├── auth.ts           # Session auth
-│   └── types.ts          # Shared TypeScript types
-└── next.config.js        # pdf-parse alias fix, security headers
+│   ├── pdf-extract.ts        # pdfjs-dist PDF parser (serverless-safe)
+│   ├── embeddings.ts         # Remote + local embedding fallback
+│   ├── llm.ts                # Streaming OpenAI-compatible client
+│   ├── chunk.ts              # 512-token paragraph-aware splitter
+│   ├── auth.ts               # HMAC-SHA256 sessions
+│   ├── store.ts              # Storage facade
+│   └── storage/
+│       ├── postgres-adapter.ts
+│       └── json-adapter.ts
+├── proxy.ts                  # Edge runtime route guard
+├── next.config.js
+└── vercel.json
 ```
+
+---
+
+## PDF Troubleshooting
+
+| Error | Cause | Fix |
+|---|---|---|
+| `No text layer found` | Scanned (image-only) PDF | Run OCR (Adobe Acrobat, iLovePDF, or `ocrmypdf`) before uploading |
+| `Indexing failed: A database error occurred` | pgvector extension missing | Neon dashboard → Extensions → Enable **vector** |
+| `Indexing failed: Embedding dimension mismatch` | Changed `EMBED_DIM` or model after upload | Delete old documents and re-upload |
+| `Could not connect to the database` | Wrong `DATABASE_URL` | Check string format and SSL settings in Vercel env vars |
+| `AI answers not configured` | Missing `LLM_API_KEY` | Add key in Vercel → Settings → Environment Variables → Redeploy |
+| Upload stuck on Processing | Large file or timeout | Check Vercel function logs; 15 MB limit per file |
+
+---
+
+## Changing LLM Providers
+
+All configuration is through environment variables — no code changes needed.
+
+### Switch to GPT-4o (OpenAI)
+
+```env
+LLM_API_KEY=sk-proj-...
+# LLM_BASE_URL is not needed for OpenAI (uses default)
+LLM_CHAT_MODEL=gpt-4o-mini
+LLM_EMBED_MODEL=text-embedding-3-small
+EMBED_DIM=1536
+```
+
+> ⚠️ When changing `EMBED_DIM`, delete all existing documents and re-upload. Mixed vector dimensions corrupt search.
+
+### Switch to Groq (Llama — free)
+
+```env
+LLM_API_KEY=gsk_...
+LLM_BASE_URL=https://api.groq.com/openai/v1
+LLM_CHAT_MODEL=llama-3.3-70b-versatile
+# Groq doesn't have embeddings — omit LLM_EMBED_MODEL to use local fallback
+```
+
+### Use Ollama (local/private)
+
+```env
+LLM_API_KEY=ollama
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_CHAT_MODEL=llama3.2
+```
+
+> Ollama must be running and the model pulled: `ollama pull llama3.2`
+
+---
+
+## Security Notes
+
+- `AUTH_SECRET` must be a cryptographically random string ≥ 32 characters. Use `openssl rand -base64 32`.
+- The Settings page **never** shows API keys, base URLs, or provider names in the UI.
+- All provider configuration is server-side only (environment variables).
+- Sessions use HMAC-SHA256 signed tokens with 7-day expiry.
+- The Edge runtime route guard (`proxy.ts`) verifies the HMAC signature without Node.js dependencies.
+
+---
+
+## Neon Database Setup (detailed)
+
+1. **Create project** at [neon.tech](https://neon.tech) (free tier works)
+2. **Enable pgvector**: Neon Dashboard → your project → **Extensions** tab → search `vector` → **Enable**
+3. **Copy connection string**: Dashboard → **Connection Details** → copy the `postgresql://...` string
+4. **Add SSL**: The connection string from Neon already includes `?sslmode=require`
+5. **Set in Vercel**: Project Settings → Environment Variables → `DATABASE_URL` = connection string
+
+DocuMind runs `CREATE EXTENSION IF NOT EXISTS vector` on first boot. If the extension isn't pre-enabled on Neon, this may fail silently — enable it manually from the Neon dashboard.
+
+---
+
+## Local Development Without a Database
+
+If you don't set `DATABASE_URL`, DocuMind falls back to an in-memory JSON store. Data resets on every server restart. Good for testing the UI.
+
+```env
+# Minimal .env.local for local testing (no database)
+AUTH_SECRET=any-long-random-string-here-32chars
+```
+
+---
+
+## Export Formats
+
+| Format | Use case |
+|---|---|
+| **JSON** | Full metadata, structured import/export |
+| **CSV** | Spreadsheet analysis (Excel, Google Sheets) |
+| **Markdown** | Human-readable documentation |
+| **JSONL** | LLM fine-tuning datasets (OpenAI, Together, Axolotl) |
+
+---
+
+## Built With
+
+| Technology | Purpose |
+|---|---|
+| [Next.js 16](https://nextjs.org) | Full-stack React framework |
+| [Tailwind CSS v4](https://tailwindcss.com) | Utility-first styling |
+| [Framer Motion](https://www.framer.com/motion/) | Animations |
+| [pgvector](https://github.com/pgvector/pgvector) | Vector similarity search |
+| [pdfjs-dist](https://mozilla.github.io/pdf.js/) | Serverless-safe PDF parsing |
+| [Neon](https://neon.tech) | Serverless Postgres |
+| [Vercel](https://vercel.com) | Deployment platform |
+| [Lucide React](https://lucide.dev) | Icons |
+| [Recharts](https://recharts.org) | Analytics charts |
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT © Shaik Muzzammil
 
-Built by [ShaikMuzzammil](https://github.com/ShaikMuzzammil) · Deployed at [documind-iota-lyart.vercel.app](https://documind-iota-lyart.vercel.app)
+---
+
+<div align="center">
+
+Made with ♥ by [ShaikMuzzammil](https://shaikmuzzammil.vercel.app)
+
+</div>
