@@ -96,7 +96,7 @@ export default function LandingPage() {
 
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
-              href="/auth?mode=signup"
+              href="/auth?mode=register"
               className="flex items-center gap-2 rounded-2xl bg-accent px-8 py-4 text-base font-bold text-white hover:opacity-90 transition-opacity shadow-lg shadow-accent/30"
             >
               Start for free <ArrowRight className="h-5 w-5" />
@@ -275,7 +275,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <Link
-                  href="/auth?mode=signup"
+                  href="/auth?mode=register"
                   className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
                 >
                   Try this workflow <ChevronRight className="h-3 w-3" />
@@ -323,7 +323,7 @@ export default function LandingPage() {
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link
-                  href="/auth?mode=signup"
+                  href="/auth?mode=register"
                   className="flex items-center gap-2 rounded-2xl bg-accent px-7 py-3.5 text-base font-bold text-white hover:opacity-90 transition-opacity shadow-lg shadow-accent/25"
                 >
                   Create free account <ArrowRight className="h-4 w-4" />
@@ -355,7 +355,7 @@ export default function LandingPage() {
               Built with Next.js · pgvector · OpenAI-compatible — Deployed on Vercel
             </p>
             <div className="flex items-center gap-4 text-xs text-text-muted">
-              <Link href="/auth?mode=signup" className="hover:text-text-secondary transition-colors">Get started</Link>
+              <Link href="/auth?mode=register" className="hover:text-text-secondary transition-colors">Get started</Link>
               <Link href="/help" className="hover:text-text-secondary transition-colors">Help</Link>
             </div>
           </div>

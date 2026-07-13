@@ -1,6 +1,6 @@
 <div align="center">
 
-# DocuMind v8.0
+# DocuMind v8.1
 
 ### Intelligent Document Workspace · RAG Platform · Self-Hostable
 

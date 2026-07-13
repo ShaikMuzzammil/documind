@@ -2,12 +2,16 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  // pg and bcryptjs need native Node.js bindings and must stay external.
-  // pdfjs-dist is listed here so Turbopack / webpack never try to bundle it
-  // — they leave it as a runtime require() from node_modules instead.
-  // This is the key fix for the "Failed to load external module pdf-parse-HASH"
-  // error on Vercel: we now import pdfjs-dist directly (lib/pdf-extract.ts)
-  // instead of going through pdf-parse's root index.js.
+  // These packages must run in the native Node.js runtime.
+  //
+  // bcryptjs / pg: native bindings that can't be bundled by Turbopack.
+  //
+  // pdfjs-dist: listed here so Turbopack / webpack never try to bundle it.
+  //   pdfjs-dist ships with large binary assets and workers that break when
+  //   bundled. Marking it external means Node.js loads it directly from
+  //   node_modules at runtime — exactly what we want in a Vercel function.
+  //   The /legacy/build/pdf.js entry (available in pdfjs-dist v3+) provides
+  //   a CJS build with no Web Worker requirement.
   serverExternalPackages: ['bcryptjs', 'pg', 'pdfjs-dist'],
 
   async headers() {

@@ -1,17 +1,30 @@
 // lib/pdf-extract.ts
-// Direct pdfjs-dist wrapper — completely bypasses pdf-parse's root index.js
-// which tries to load test PDF files at require-time, crashing on Vercel.
-// pdfjs-dist is bundled as a transitive dependency of pdf-parse and is
-// always present in node_modules. It is also listed in serverExternalPackages
-// so the Node.js runtime loads it directly without any bundler interference.
+// Direct pdfjs-dist v3 wrapper.
+//
+// Why not pdf-parse?
+//   pdf-parse/index.js loads test PDFs at require-time via a top-level
+//   `fs.readFileSync` call. In Vercel serverless that path doesn't exist
+//   and the entire module crashes before any of our code runs. Using
+//   pdfjs-dist directly bypasses that issue entirely.
+//
+// Why pdfjs-dist @3.x?
+//   The /legacy/build/pdf.js entry point (introduced in v3) gives us a
+//   CommonJS-compatible build with no Web Worker requirement — perfect
+//   for Node.js serverless. v2.0.x only shipped /build/pdf.js which
+//   lacks the legacy alias and caused a Turbopack module-not-found error.
+//
+// Why serverExternalPackages?
+//   Listed in next.config.js so Turbopack/webpack never tries to bundle it;
+//   it stays as a native Node.js require() at runtime.
 
 export async function extractPdfText(buffer: Buffer): Promise<string> {
   /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any */
   const pdfjsLib: any = require('pdfjs-dist/legacy/build/pdf.js');
   /* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any */
 
-  // Disable the Web Worker — not available in Vercel serverless environments
-  pdfjsLib.GlobalWorkerOptions.workerSrc = false;
+  // Disable the Web Worker — not available in Vercel serverless environments.
+  // Empty string is the correct v3 value (false is not a valid string type).
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(buffer),
