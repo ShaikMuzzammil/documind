@@ -654,13 +654,16 @@ export default function ChatPage() {
                     </button>
                   ))}
                 </div>
-                {chatMode === 'documents' && collections.length === 0 && (
-                  <Link
-                    href="/documents"
-                    className="mt-6 inline-flex items-center gap-2 rounded-xl border border-accent/25 bg-accent/8 px-4 py-2.5 text-sm text-accent hover:bg-accent/15 transition-colors"
-                  >
-                    <Upload className="h-4 w-4" /> Upload your first document to get started
-                  </Link>
+                {chatMode === 'documents' && (
+                  <div className="mt-6 flex flex-col sm:flex-row gap-2 justify-center">
+                    <Link
+                      href="/documents"
+                      className="inline-flex items-center gap-2 rounded-xl border border-accent/25 bg-accent/8 px-4 py-2.5 text-sm text-accent hover:bg-accent/15 transition-colors"
+                    >
+                      <Upload className="h-4 w-4" />
+                      {collections.length === 0 ? 'Upload your first document' : 'Upload more documents'}
+                    </Link>
+                  </div>
                 )}
               </div>
             ) : (
