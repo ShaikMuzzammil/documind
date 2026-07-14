@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireCurrentUser } from '@/lib/auth';
 import { chunkText } from '@/lib/chunk';
 import { embed } from '@/lib/embeddings';
-import { addChunks, saveDocument } from '@/lib/store';
+import { addChunks, getCollections, saveDocument } from '@/lib/store';
 import { extractPdfText } from '@/lib/pdf-extract';
 import { Chunk, DocumentMeta } from '@/lib/types';
 import { generateId } from '@/lib/utils';
 
-export const runtime    = 'nodejs';
+export const runtime     = 'nodejs';
 export const maxDuration = 60;
 export const dynamic     = 'force-dynamic';
 
@@ -21,10 +21,7 @@ const SUPPORTED_TEXT_EXTENSIONS = [
 
 class IngestError extends Error {
   status: number;
-  constructor(message: string, status = 400) {
-    super(message);
-    this.status = status;
-  }
+  constructor(message: string, status = 400) { super(message); this.status = status; }
 }
 
 async function parsePdf(buffer: Buffer): Promise<string> {
@@ -33,15 +30,14 @@ async function parsePdf(buffer: Buffer): Promise<string> {
     if (!text.trim()) {
       throw new Error(
         'No text layer found. This PDF may be scanned (image-only). ' +
-        'Run OCR first to add a text layer before uploading.',
+        'Run OCR first (e.g. Adobe Acrobat, Smallpdf) to add a text layer.',
       );
     }
     return text;
   } catch (err) {
     throw new IngestError(
-      `Could not read this PDF (${err instanceof Error ? err.message : 'parsing failed'}). ` +
-      `It may be scanned (image-only), encrypted, or corrupted. ` +
-      `For scanned PDFs, run OCR first to add a text layer.`,
+      `Could not read this PDF: ${err instanceof Error ? err.message : 'parsing failed'}. ` +
+      'For scanned PDFs, run OCR first to add a text layer.',
       422,
     );
   }
@@ -55,9 +51,8 @@ async function extractText(file: File): Promise<string> {
 
   const ext = name.includes('.') ? `.${name.split('.').pop()}` : '';
   if (ext && !SUPPORTED_TEXT_EXTENSIONS.includes(ext)) {
-    // Binary sniff — reject obvious binary files
-    const sample = buffer.subarray(0, 1000);
-    let nullBytes = 0;
+    const sample    = buffer.subarray(0, 1000);
+    let nullBytes   = 0;
     for (const byte of sample) if (byte === 0) nullBytes++;
     if (nullBytes > 0) {
       throw new IngestError(
@@ -66,94 +61,109 @@ async function extractText(file: File): Promise<string> {
       );
     }
   }
-
   return buffer.toString('utf-8');
 }
 
 export async function POST(req: NextRequest) {
+  const user = await requireCurrentUser(req).catch(() => null);
+  if (!user) {
+    return NextResponse.json({ error: 'Please sign in to upload documents.' }, { status: 401 });
+  }
+
+  let form: FormData;
   try {
-    const user = await requireCurrentUser(req).catch(() => null);
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Please sign in to upload documents.' },
-        { status: 401 },
-      );
-    }
+    form = await req.formData();
+  } catch {
+    return NextResponse.json(
+      { error: 'Upload could not be read. Try a smaller file or check your connection.' },
+      { status: 400 },
+    );
+  }
 
-    let form: FormData;
-    try {
-      form = await req.formData();
-    } catch {
-      return NextResponse.json(
-        { error: 'The upload could not be read. Try a smaller file or check your connection.' },
-        { status: 400 },
-      );
-    }
+  const file         = form.get('file');
+  const collectionId = (form.get('collectionId') || '').toString().trim();
 
-    const file         = form.get('file');
-    const collectionId = (form.get('collectionId') || '').toString();
+  if (!(file instanceof File)) return NextResponse.json({ error: 'No file was provided.' }, { status: 400 });
+  if (!collectionId) return NextResponse.json({ error: 'Choose a collection before uploading.' }, { status: 400 });
+  if (file.size === 0) return NextResponse.json({ error: `"${file.name}" is empty.` }, { status: 422 });
+  if (file.size > MAX_FILE_BYTES) {
+    return NextResponse.json(
+      { error: `"${file.name}" is too large. Max size is ${Math.floor(MAX_FILE_BYTES / 1024 / 1024)} MB per file.` },
+      { status: 413 },
+    );
+  }
 
-    if (!(file instanceof File))
-      return NextResponse.json({ error: 'No file was provided.' }, { status: 400 });
-    if (!collectionId)
-      return NextResponse.json({ error: 'Choose a collection before uploading.' }, { status: 400 });
-    if (file.size === 0)
-      return NextResponse.json({ error: `"${file.name}" is empty.` }, { status: 422 });
-    if (file.size > MAX_FILE_BYTES) {
-      return NextResponse.json(
-        { error: `"${file.name}" is too large. The limit is ${Math.floor(MAX_FILE_BYTES / (1024 * 1024))}MB per file.` },
-        { status: 413 },
-      );
-    }
+  // ── Pre-flight: verify collection exists ──────────────────────────────────
+  // Do this BEFORE any DB writes so the error is clear and fast.
+  const userCollections = await getCollections(user.id).catch(() => [] as Awaited<ReturnType<typeof getCollections>>);
+  const collectionExists = userCollections.some(c => c.id === collectionId);
+  if (!collectionExists) {
+    return NextResponse.json(
+      {
+        error:
+          'This collection no longer exists in the database. ' +
+          'Go to the Collections page, create a new collection, then re-upload. ' +
+          '(Tip: if you just created the collection, refresh the page and try again.)',
+        code: 'COLLECTION_NOT_FOUND',
+      },
+      { status: 400 },
+    );
+  }
 
-    const docId    = generateId();
-    const baseDoc: DocumentMeta = {
-      id: docId, userId: user.id, name: file.name,
-      type: file.type || 'text/plain', size: file.size,
-      collectionId, chunkCount: 0, status: 'processing',
-      createdAt: new Date().toISOString(),
-    };
+  const docId   = generateId();
+  const baseDoc: DocumentMeta = {
+    id: docId, userId: user.id, name: file.name,
+    type: file.type || 'text/plain', size: file.size,
+    collectionId, chunkCount: 0, status: 'processing',
+    createdAt: new Date().toISOString(),
+  };
 
-    try {
-      const text   = await extractText(file);
-      const pieces = chunkText(text);
+  // ── CRITICAL: Save document row FIRST (status=processing) ─────────────────
+  // The chunks table has a FK on document_id → documents(id).
+  // If we insert chunks before the document row exists, every insert fails
+  // with a FK violation (error code 23503). Save the document first so
+  // the document row is present when addChunks runs.
+  try {
+    await saveDocument(baseDoc);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Database error saving document.';
+    return NextResponse.json({ error: `Pre-save failed: ${msg}` }, { status: 500 });
+  }
 
-      if (!pieces.length) {
-        const errDoc = { ...baseDoc, status: 'error' as const, error: 'No readable text was found in this file.' };
-        await saveDocument(errDoc).catch(() => undefined);
-        return NextResponse.json({ document: errDoc, error: errDoc.error }, { status: 422 });
-      }
+  // ── Process file ───────────────────────────────────────────────────────────
+  try {
+    const text   = await extractText(file);
+    const pieces = chunkText(text);
 
-      const embeddings = await embed(pieces);
-      const chunks: Chunk[] = pieces.map((textPiece, i) => ({
-        id: generateId(), userId: user.id, documentId: docId,
-        collectionId, index: i, text: textPiece, embedding: embeddings[i],
-      }));
-
-      await addChunks(chunks);
-
-      const readyDoc: DocumentMeta = { ...baseDoc, chunkCount: chunks.length, status: 'ready' };
-      await saveDocument(readyDoc);
-
-      return NextResponse.json({ document: readyDoc }, { status: 201 });
-
-    } catch (err) {
-      const message = err instanceof IngestError
-        ? err.message
-        : err instanceof Error
-          ? `Indexing failed: ${err.message}`
-          : 'Indexing failed unexpectedly.';
-
-      const errDoc = { ...baseDoc, status: 'error' as const, error: message };
+    if (!pieces.length) {
+      const errDoc = { ...baseDoc, status: 'error' as const, error: 'No readable text found in this file.' };
       await saveDocument(errDoc).catch(() => undefined);
-      const status = err instanceof IngestError ? err.status : 500;
-      return NextResponse.json({ document: errDoc, error: message }, { status });
+      return NextResponse.json({ document: errDoc, error: errDoc.error }, { status: 422 });
     }
+
+    const embeddings = await embed(pieces);
+    const chunks: Chunk[] = pieces.map((textPiece, i) => ({
+      id: generateId(), userId: user.id, documentId: docId,
+      collectionId, index: i, text: textPiece, embedding: embeddings[i],
+    }));
+
+    await addChunks(chunks);
+
+    const readyDoc: DocumentMeta = { ...baseDoc, chunkCount: chunks.length, status: 'ready' };
+    await saveDocument(readyDoc);
+
+    return NextResponse.json({ document: readyDoc }, { status: 201 });
 
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Upload failed unexpectedly. Please try again.' },
-      { status: 500 },
-    );
+    const message = err instanceof IngestError
+      ? err.message
+      : err instanceof Error
+        ? `Indexing failed: ${err.message}`
+        : 'Indexing failed unexpectedly.';
+
+    const errDoc = { ...baseDoc, status: 'error' as const, error: message };
+    await saveDocument(errDoc).catch(() => undefined); // best-effort update
+    const status = err instanceof IngestError ? err.status : 500;
+    return NextResponse.json({ document: errDoc, error: message }, { status });
   }
 }
