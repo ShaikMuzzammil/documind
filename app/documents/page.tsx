@@ -7,6 +7,7 @@ import {
   Copy, Database, Eye, File, FileCode, FileText, Filter,
   FolderOpen, Hash, Layers, Loader2, MessageSquare, Plus,
   RefreshCw, Search, Trash2, UploadCloud, X, Zap, Sparkles,
+  Files, ArrowRight, Info,
 } from 'lucide-react';
 import AuthGate from '@/components/app/AuthGate';
 import { useCollections } from '@/lib/use-collections';
@@ -14,11 +15,12 @@ import { useToast } from '@/components/shared/Toast';
 import { Collection, DocumentMeta } from '@/lib/types';
 import { formatBytes, relativeTime } from '@/lib/utils';
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 type SortField = 'name' | 'size' | 'createdAt' | 'status';
 type SortDir   = 'asc' | 'desc';
 type DbHealth  = { ok: boolean; mode: string; pgvector: boolean; message: string; error?: string } | null;
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function statusClass(s: DocumentMeta['status']) {
   if (s === 'ready')      return 'text-success bg-success/10 border-success/20';
   if (s === 'processing') return 'text-accent  bg-accent/10  border-accent/20';
@@ -34,12 +36,12 @@ function FileTypeIcon({ name }: { name: string }) {
   return <Hash className="h-3.5 w-3.5 text-text-muted" />;
 }
 
-// ─── Quick-create collection modal ───────────────────────────────────────────
+// ─── Create Collection Modal ──────────────────────────────────────────────────
 function CreateCollectionModal({ onCreated, onClose }: { onCreated: (c: Collection) => void; onClose: () => void }) {
-  const [name, setName]     = useState('');
-  const [desc, setDesc]     = useState('');
-  const [busy, setBusy]     = useState(false);
-  const [err, setErr]       = useState('');
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err,  setErr]  = useState('');
   const { success, error: toastError } = useToast();
 
   const submit = async () => {
@@ -73,7 +75,7 @@ function CreateCollectionModal({ onCreated, onClose }: { onCreated: (c: Collecti
           </div>
           <div>
             <h2 className="font-bold text-sm">New Collection</h2>
-            <p className="text-[11px] text-text-muted">Group your documents into a searchable workspace</p>
+            <p className="text-[11px] text-text-muted">Group documents into a searchable workspace</p>
           </div>
           <button onClick={onClose} className="ml-auto p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors">
             <X className="h-4 w-4" />
@@ -112,7 +114,10 @@ function CreateCollectionModal({ onCreated, onClose }: { onCreated: (c: Collecti
 function DbHealthBanner({ health }: { health: DbHealth }) {
   const [copied, setCopied] = useState(false);
   if (!health || health.ok) return null;
-  const copy = () => { navigator.clipboard.writeText(health.error || health.message); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+  const copy = () => {
+    navigator.clipboard.writeText(health.error || health.message);
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
+  };
   return (
     <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/8 px-4 py-3">
       <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
@@ -134,12 +139,12 @@ function DbHealthBanner({ health }: { health: DbHealth }) {
   );
 }
 
-// ─── Preview Modal ─────────────────────────────────────────────────────────────
+// ─── Preview Modal ────────────────────────────────────────────────────────────
 function PreviewModal({ doc, onClose }: { doc: DocumentMeta; onClose: () => void }) {
-  const [loading, setLoading]   = useState(true);
-  const [data, setData]         = useState<{ chunkCount: number; chunks: { index: number; text: string }[] } | null>(null);
-  const [activeChunk, setActive]= useState(0);
-  const [error, setError]       = useState('');
+  const [loading, setLoading]    = useState(true);
+  const [data, setData]          = useState<{ chunkCount: number; chunks: { index: number; text: string }[] } | null>(null);
+  const [activeChunk, setActive] = useState(0);
+  const [error, setError]        = useState('');
 
   useEffect(() => {
     fetch(`/api/documents/${doc.id}/preview`).then(r => r.json())
@@ -157,7 +162,7 @@ function PreviewModal({ doc, onClose }: { doc: DocumentMeta; onClose: () => void
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="font-bold text-sm truncate">{doc.name}</h2>
-            <p className="text-[11px] text-text-muted">{formatBytes(doc.size)} · {doc.chunkCount} chunks</p>
+            <p className="text-[11px] text-text-muted">{formatBytes(doc.size)} · {doc.chunkCount} chunks indexed</p>
           </div>
           <Link href={`/chat?collectionId=${doc.collectionId}`}
             className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[11px] font-semibold text-white hover:opacity-90 transition-opacity">
@@ -213,14 +218,15 @@ function PreviewModal({ doc, onClose }: { doc: DocumentMeta; onClose: () => void
 type BotMsg = { role: 'bot' | 'user'; text: string };
 
 const BOT_RESPONSES: { pattern: RegExp; text: string }[] = [
-  { pattern: /pgvector|extension|vector does not/i,   text: 'Enable the pgvector extension in your Neon dashboard → Databases → Extensions → search "vector" → Enable. Then re-upload.' },
-  { pattern: /ocr|scanned|no text layer/i,            text: 'This PDF has no text layer — it may be a scanned image. Run OCR first (Adobe Acrobat, Smallpdf, or ILovePDF OCR) then re-upload.' },
-  { pattern: /COLLECTION_NOT_FOUND|collection.*not.*exist|no longer exist/i, text: 'The collection reference failed. The collection you selected doesn\'t exist in the database. Use the "New Collection" button above, create a collection, select it, then try uploading again.' },
-  { pattern: /dimension|embed_dim/i,                  text: 'Embedding dimension mismatch. Drop and recreate the chunks table in Neon SQL Editor to fix this.' },
-  { pattern: /document.*not.*exist|document.*fk/i,    text: 'Document FK error. This was a bug in an older version — make sure you\'re on v8.3+.' },
-  { pattern: /multi|multiple|batch/i,                 text: 'Yes! Select multiple files in the file picker or drag multiple files onto the drop zone — all will upload in sequence.' },
-  { pattern: /pdf|format/i,                           text: 'DocuMind extracts text from PDFs using pdfjs-dist. Encrypted, password-protected, or scanned (image-only) PDFs are not supported.' },
-  { pattern: /chunk|how many/i,                       text: 'Ask me your chunk count by typing "how many chunks?" and I\'ll look it up from your document stats.' },
+  { pattern: /pgvector|extension|vector does not/i,    text: 'Enable pgvector in your Neon dashboard → Databases → Extensions → search "vector" → Enable. Then re-upload.' },
+  { pattern: /ocr|scanned|no text layer/i,             text: 'This PDF has no text layer — it may be a scanned image. Run OCR first (Adobe Acrobat, Smallpdf, or ILovePDF) then re-upload.' },
+  { pattern: /COLLECTION_NOT_FOUND|collection.*not.*exist|no longer exist/i, text: 'The collection reference failed. Create a new collection using the "New Collection" button, select it, then upload.' },
+  { pattern: /dimension|embed_dim/i,                   text: 'Embedding dimension mismatch. Drop and recreate the chunks table in Neon SQL Editor, then retry.' },
+  { pattern: /multi|multiple|batch|files/i,            text: 'Yes! Select multiple files in the file picker or drag multiple files at once — all will upload in sequence with individual progress.' },
+  { pattern: /pdf|format/i,                            text: 'DocuMind extracts text from PDFs using pdfjs-dist. Encrypted, password-protected, or scanned (image-only) PDFs are not supported without OCR.' },
+  { pattern: /chunk|how many|count/i,                  text: 'I can look up your chunk count — just ask "how many chunks?" and I\'ll tally them from your indexed documents.' },
+  { pattern: /size|large|too big/i,                    text: 'Maximum file size is 15 MB per file. Split larger files before uploading.' },
+  { pattern: /retry|try again/i,                       text: 'Delete the failed document from the list on the right, then re-upload. If the error persists, check the error details by clicking the alert icon.' },
 ];
 
 function getBotTip(errorMsg?: string): string {
@@ -228,11 +234,11 @@ function getBotTip(errorMsg?: string): string {
   for (const { pattern, text } of BOT_RESPONSES) {
     if (pattern.test(errorMsg)) return text;
   }
-  return `Error: ${errorMsg.slice(0, 140)}`;
+  return `Upload error: ${errorMsg.slice(0, 140)}. Check the error details row on the right for the full message.`;
 }
 
 function UploadBot({ docs, dbHealth }: { docs: DocumentMeta[]; dbHealth: DbHealth }) {
-  const [msgs, setMsgs] = useState<BotMsg[]>([{ role: 'bot', text: 'Hi! I\'m your upload assistant. Drop files and I\'ll help troubleshoot any issues.' }]);
+  const [msgs, setMsgs]   = useState<BotMsg[]>([{ role: 'bot', text: 'Hi! I\'m your upload assistant. Drop files and I\'ll troubleshoot any issues in real time.' }]);
   const [input, setInput] = useState('');
   const [open, setOpen]   = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -245,7 +251,7 @@ function UploadBot({ docs, dbHealth }: { docs: DocumentMeta[]; dbHealth: DbHealt
       if (!seenErrors.current.has(key)) {
         seenErrors.current.add(key);
         const tip = getBotTip(d.error);
-        if (tip) setMsgs(prev => [...prev, { role: 'bot', text: tip }]);
+        if (tip) setMsgs(prev => [...prev, { role: 'bot', text: `⚠️ "${d.name.slice(0, 30)}": ${tip}` }]);
       }
     }
   }, [docs]);
@@ -253,7 +259,7 @@ function UploadBot({ docs, dbHealth }: { docs: DocumentMeta[]; dbHealth: DbHealt
   useEffect(() => {
     if (dbHealth && !dbHealth.ok) {
       const tip = !dbHealth.pgvector
-        ? 'Enable the pgvector extension in your Neon dashboard → Extensions → search "vector" → Enable. Then retry uploads.'
+        ? 'Enable pgvector in your Neon dashboard → Extensions → search "vector" → Enable. Then retry uploads.'
         : dbHealth.message;
       setMsgs(prev => {
         if (prev.some(m => m.text === tip)) return prev;
@@ -269,20 +275,21 @@ function UploadBot({ docs, dbHealth }: { docs: DocumentMeta[]; dbHealth: DbHealt
     setInput('');
     setMsgs(prev => [...prev, { role: 'user', text: q }]);
     setTimeout(() => {
-      let response = 'Try dropping a file onto the upload zone on the left, or ask me about "pdf errors", "collections", or "multi-file".';
+      let response = 'Try dropping a file onto the upload zone above, or ask about "pdf errors", "collections", "multi-file", or "retry".';
       for (const { pattern, text } of BOT_RESPONSES) {
-        if (pattern.test(q)) { response = text as string; break; }
+        if (pattern.test(q)) { response = text; break; }
       }
-      if (/chunk/i.test(q)) {
+      if (/chunk|how many|count/i.test(q)) {
         const total = docs.reduce((s, d) => s + d.chunkCount, 0);
         const ready = docs.filter(d => d.status === 'ready').length;
-        response = `You have ${ready} ready document${ready !== 1 ? 's' : ''} with ${total.toLocaleString()} total chunks indexed.`;
+        response = `You have ${ready} ready document${ready !== 1 ? 's' : ''} with ${total.toLocaleString()} total chunks indexed and searchable.`;
       }
       setMsgs(prev => [...prev, { role: 'bot', text: response }]);
-    }, 350);
+    }, 300);
   };
 
-  const quickReplies = ['Collection error?', 'PDF not reading?', 'Multi-file upload?', 'How many chunks?'];
+  const quickReplies = ['PDF not reading?', 'Multi-file upload?', 'Collection error?', 'How many chunks?'];
+  const errorCount = docs.filter(d => d.status === 'error').length;
 
   return (
     <div className="glass rounded-2xl overflow-hidden border border-border/50">
@@ -293,13 +300,18 @@ function UploadBot({ docs, dbHealth }: { docs: DocumentMeta[]; dbHealth: DbHealt
             <Bot className="h-3.5 w-3.5 text-accent" />
           </div>
           <span className="text-sm font-semibold">Upload Assistant</span>
-          {docs.some(d => d.status === 'error') && <span className="flex h-2 w-2 rounded-full bg-danger animate-pulse" />}
+          {errorCount > 0 && (
+            <span className="flex items-center gap-1 rounded-full bg-danger/10 border border-danger/20 px-2 py-0.5 text-[10px] font-bold text-danger">
+              <span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse" />
+              {errorCount} error{errorCount > 1 ? 's' : ''}
+            </span>
+          )}
         </div>
         {open ? <ChevronUp className="h-4 w-4 text-text-muted" /> : <ChevronDown className="h-4 w-4 text-text-muted" />}
       </button>
       {open && (
         <div className="border-t border-border/50">
-          <div className="h-48 overflow-y-auto px-3 py-3 space-y-2">
+          <div className="h-44 overflow-y-auto px-3 py-3 space-y-2">
             {msgs.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {m.role === 'bot' && (
@@ -308,7 +320,9 @@ function UploadBot({ docs, dbHealth }: { docs: DocumentMeta[]; dbHealth: DbHealt
                   </div>
                 )}
                 <div className={`rounded-xl px-3 py-2 text-xs leading-relaxed max-w-[85%] ${
-                  m.role === 'user' ? 'bg-accent text-white rounded-tr-sm' : 'bg-bg-card border border-border text-text-secondary rounded-tl-sm'
+                  m.role === 'user'
+                    ? 'bg-accent text-white rounded-tr-sm'
+                    : 'bg-bg-card border border-border text-text-secondary rounded-tl-sm'
                 }`}>{m.text}</div>
               </div>
             ))}
@@ -326,7 +340,7 @@ function UploadBot({ docs, dbHealth }: { docs: DocumentMeta[]; dbHealth: DbHealt
           </div>
           <div className="flex items-center gap-2 border-t border-border/50 px-3 py-2">
             <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()}
-              placeholder="Ask about uploads…"
+              placeholder="Ask about uploads, errors, PDFs…"
               className="flex-1 bg-transparent text-xs text-text-primary placeholder:text-text-muted outline-none py-1" />
             <button onClick={() => send()} disabled={!input.trim()}
               className="flex h-6 w-6 items-center justify-center rounded-lg bg-accent text-white disabled:opacity-30 hover:opacity-90 transition-opacity">
@@ -368,7 +382,14 @@ function UploadZone({
     setFiles(prev => {
       const names = new Set(prev.map(f => f.name));
       const fresh = arr.filter(f => !names.has(f.name));
-      if (fresh.length) info(`${fresh.length} file${fresh.length > 1 ? 's' : ''} queued`, 'Click "Upload & index" to start.');
+      if (fresh.length > 0) {
+        info(
+          `${fresh.length} file${fresh.length > 1 ? 's' : ''} queued`,
+          fresh.length > 1
+            ? `${fresh.map(f => f.name.slice(0, 20)).join(', ')} — click "Upload & index" to start.`
+            : `${fresh[0].name} — click "Upload & index" to start.`
+        );
+      }
       return [...prev, ...fresh];
     });
   };
@@ -380,33 +401,32 @@ function UploadZone({
   };
 
   const uploadAll = async () => {
-    if (!files.length) { warning('No files', 'Add at least one file to upload.'); return; }
+    if (!files.length) { warning('No files selected', 'Add at least one file to upload.'); return; }
+    if (!targetColl) { toastError('No collection selected', 'Create a collection first, then upload.'); onNeedCollection(); return; }
 
-    // Pre-validate collection
-    if (!targetColl) { toastError('No collection selected', 'Create a collection first.'); onNeedCollection(); return; }
     const collectionValid = collections.some(c => c.id === targetColl);
     if (!collectionValid) {
-      toastError('Collection not found', 'This collection no longer exists. Please create a new one.');
-      onNeedCollection();
-      return;
+      toastError('Collection not found', 'This collection no longer exists. Create a new one.');
+      onNeedCollection(); return;
     }
 
-    // Verify collection still exists on server (prevents stale cache issues)
+    // Verify on server (prevents stale cache)
     try {
       const fresh = await fetch('/api/collections').then(r => r.json());
       const serverValid = (fresh.collections || []).some((c: Collection) => c.id === targetColl);
       if (!serverValid) {
-        toastError('Collection out of sync', 'Your collection no longer exists in the database. Please create a new collection and try again.');
-        onNeedCollection();
-        return;
+        toastError('Collection out of sync', 'Collection removed from database. Create a new collection and retry.');
+        onNeedCollection(); return;
       }
-    } catch { /* proceed, server will catch it */ }
+    } catch { /* server will catch it */ }
 
     setUploading(true);
     const init: Record<string, FileStatus> = {};
     files.forEach(f => { init[f.name] = 'pending'; });
     setProgress(init);
     setFileErrors({});
+
+    info('Uploading…', `Processing ${files.length} file${files.length > 1 ? 's' : ''} — please wait.`);
 
     let doneCount = 0, failCount = 0;
 
@@ -427,20 +447,31 @@ function UploadZone({
         setProgress(p => ({ ...p, [file.name]: 'error' }));
         setFileErrors(e => ({ ...e, [file.name]: msg }));
         toastError(`Failed: ${file.name.slice(0, 30)}`, msg.slice(0, 100));
-        // If collection issue, open modal
         if (/COLLECTION_NOT_FOUND|collection.*not.*exist/i.test(msg)) onNeedCollection();
         failCount++;
       }
     }
 
     setUploading(false);
-    if (doneCount > 0) {
-      success(`${doneCount} file${doneCount > 1 ? 's' : ''} indexed!`, 'Go to Chat to ask questions about your documents.');
-      if (failCount === 0) setTimeout(() => { setFiles([]); setProgress({}); }, 1800);
+
+    if (doneCount > 0 && failCount === 0) {
+      success(
+        `${doneCount} file${doneCount > 1 ? 's' : ''} indexed!`,
+        'Head to Chat to ask questions about your documents.'
+      );
+      setTimeout(() => { setFiles([]); setProgress({}); }, 1800);
+    } else if (doneCount > 0) {
+      success(`${doneCount} indexed`, `${failCount} failed. Check error details for each failed file.`);
+    } else {
+      toastError('All uploads failed', 'Ask the Upload Assistant below for help diagnosing the issue.');
     }
   };
 
   const selColl = collections.find(c => c.id === targetColl);
+  const pendingCount   = files.filter(f => !progress[f.name] || progress[f.name] === 'pending').length;
+  const uploadingCount = files.filter(f => progress[f.name] === 'uploading').length;
+  const doneCount      = files.filter(f => progress[f.name] === 'done').length;
+  const errorCount     = files.filter(f => progress[f.name] === 'error').length;
 
   return (
     <div className="space-y-3">
@@ -487,8 +518,17 @@ function UploadZone({
         <UploadCloud className={`h-8 w-8 ${dragOver ? 'text-accent' : 'text-text-muted'} transition-colors`} />
         <div className="text-center">
           <p className="text-sm font-medium">{dragOver ? 'Drop files here' : 'Drop files or click to browse'}</p>
-          <p className="text-xs text-text-muted mt-0.5">PDF, MD, TXT, CSV, JSON, code · Max 15 MB each · Multi-select supported</p>
+          <p className="text-xs text-text-muted mt-0.5">PDF, MD, TXT, CSV, JSON, code · Max 15 MB · Multi-file supported</p>
         </div>
+        {files.length > 0 && (
+          <div className="flex items-center gap-2 text-xs text-text-muted">
+            <Files className="h-3.5 w-3.5 text-accent" />
+            <span className="text-accent font-medium">{files.length} file{files.length > 1 ? 's' : ''} queued</span>
+            {doneCount > 0 && <span className="text-success">· {doneCount} done</span>}
+            {errorCount > 0 && <span className="text-danger">· {errorCount} failed</span>}
+            {uploadingCount > 0 && <span className="text-accent upload-pulse">· uploading…</span>}
+          </div>
+        )}
         <input ref={inputRef} type="file" multiple
           accept=".pdf,.txt,.md,.markdown,.csv,.json,.js,.ts,.tsx,.jsx,.py,.java,.c,.cpp,.go,.rs,.rb,.php,.html,.css,.yml,.yaml,.xml,.sql,.log"
           className="hidden" onChange={e => e.target.files && addFiles(e.target.files)} />
@@ -496,15 +536,15 @@ function UploadZone({
 
       {/* File queue */}
       {files.length > 0 && (
-        <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
+        <div className="space-y-1.5 max-h-52 overflow-y-auto pr-0.5">
           {files.map(f => {
             const st  = progress[f.name];
             const err = fileErrors[f.name];
             return (
               <div key={f.name}
                 className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 transition-colors ${
-                  st === 'done' ? 'border-success/20 bg-success/5'
-                  : st === 'error' ? 'border-danger/20 bg-danger/5'
+                  st === 'done'      ? 'border-success/20 bg-success/5'
+                  : st === 'error'   ? 'border-danger/20 bg-danger/5'
                   : st === 'uploading' ? 'border-accent/20 bg-accent/5'
                   : 'border-border bg-bg-card/60'
                 }`}>
@@ -533,7 +573,7 @@ function UploadZone({
         <button onClick={uploadAll} disabled={uploading || !targetColl || collections.length === 0}
           className="w-full flex items-center justify-center gap-2 rounded-xl bg-accent py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity">
           {uploading
-            ? <><Loader2 className="h-4 w-4 animate-spin" /> Indexing…</>
+            ? <><Loader2 className="h-4 w-4 animate-spin" /> Indexing {pendingCount + uploadingCount > 0 ? `(${files.length - doneCount - errorCount} remaining)` : '…'}</>
             : <><Zap className="h-4 w-4" /> Upload &amp; index {files.length} file{files.length > 1 ? 's' : ''}</>
           }
         </button>
@@ -639,14 +679,14 @@ export default function DocumentsPage() {
 
   useEffect(() => { loadDocs(); }, [loadDocs]);
 
-  // Auto-refresh processing docs
+  // Auto-refresh processing docs every 3s
   useEffect(() => {
     if (!docs.some(d => d.status === 'processing')) return;
     const t = setInterval(loadDocs, 3000);
     return () => clearInterval(t);
   }, [docs, loadDocs]);
 
-  // DB health check once
+  // DB health check on mount
   useEffect(() => {
     fetch('/api/health').then(r => r.json()).then(setDbHealth).catch(() => undefined);
   }, []);
@@ -668,15 +708,15 @@ export default function DocumentsPage() {
     success(`${n} document${n > 1 ? 's' : ''} deleted`);
   };
 
-  const handleSelect  = (id: string, c: boolean) => setSelected(prev => { const s = new Set(prev); c ? s.add(id) : s.delete(id); return s; });
-  const toggleAll     = (c: boolean) => setSelected(c ? new Set(filtered.map(d => d.id)) : new Set());
-  const toggleSort    = (f: SortField) => { if (sort === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSort(f); setSortDir('desc'); } };
+  const handleSelect = (id: string, c: boolean) => setSelected(prev => { const s = new Set(prev); c ? s.add(id) : s.delete(id); return s; });
+  const toggleAll    = (c: boolean) => setSelected(c ? new Set(filtered.map(d => d.id)) : new Set());
+  const toggleSort   = (f: SortField) => { if (sort === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSort(f); setSortDir('desc'); } };
 
   const filtered = useMemo(() => {
     let list = [...docs];
-    if (filterColl)    list = list.filter(d => d.collectionId === filterColl);
-    if (filterStatus)  list = list.filter(d => d.status === filterStatus);
-    if (search)        list = list.filter(d => d.name.toLowerCase().includes(search.toLowerCase()));
+    if (filterColl)   list = list.filter(d => d.collectionId === filterColl);
+    if (filterStatus) list = list.filter(d => d.status === filterStatus);
+    if (search)       list = list.filter(d => d.name.toLowerCase().includes(search.toLowerCase()));
     list.sort((a, b) => {
       const m = sortDir === 'asc' ? 1 : -1;
       if (sort === 'name')   return m * a.name.localeCompare(b.name);
@@ -708,12 +748,18 @@ export default function DocumentsPage() {
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <p className="text-xs font-mono font-bold tracking-widest text-text-muted">DOCUMENT VAULT</p>
-              <h1 className="mt-1 text-3xl font-bold tracking-tight">Upload &amp; Manage Documents</h1>
-              <p className="mt-1 text-sm text-text-secondary">Add PDFs, notes, datasets, and code files. DocuMind chunks and embeds them for cited AI answers.</p>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight">Upload &amp; Manage Documents</h1>
+              <p className="mt-1 text-sm text-text-secondary">
+                Add PDFs, notes, datasets, and code files. DocuMind chunks and embeds them for cited AI answers.
+              </p>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowCreate(true)}
+              <Link href="/chat"
                 className="flex items-center gap-1.5 rounded-xl border border-accent/30 bg-accent/5 px-3 py-2 text-xs font-medium text-accent hover:bg-accent/10 transition-colors">
+                <MessageSquare className="h-3.5 w-3.5" /> Chat
+              </Link>
+              <button onClick={() => setShowCreate(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-border bg-bg-card px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors">
                 <Plus className="h-3.5 w-3.5" /> New Collection
               </button>
               <button onClick={loadDocs}
@@ -725,13 +771,13 @@ export default function DocumentsPage() {
 
           <DbHealthBanner health={dbHealth} />
 
-          {/* Stats */}
+          {/* Stats row */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { label: 'Ready',        value: readyCount,  color: 'text-success', Icon: CheckCircle2 },
-              { label: 'Errors',       value: errorCount,  color: 'text-danger',  Icon: AlertCircle  },
+              { label: 'Ready',        value: readyCount,               color: 'text-success', Icon: CheckCircle2 },
+              { label: 'Errors',       value: errorCount,               color: 'text-danger',  Icon: AlertCircle  },
               { label: 'Total Chunks', value: totalChunks.toLocaleString(), color: 'text-accent', Icon: Layers },
-              { label: 'Stored',       value: formatBytes(totalSize), color: 'text-text-primary', Icon: Database },
+              { label: 'Stored',       value: formatBytes(totalSize),  color: 'text-text-primary', Icon: Database },
             ].map(({ label, value, color, Icon }) => (
               <div key={label} className="glass rounded-xl p-4">
                 <div className="flex items-center justify-between mb-1">
@@ -750,8 +796,8 @@ export default function DocumentsPage() {
               <div className="flex-1">
                 <p className="text-sm font-semibold text-warning">No chunks indexed yet</p>
                 <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
-                  All documents have errors. Check the error details on each row and use the Upload Assistant below for guidance.
-                  Chat will not return useful answers until at least one document is indexed successfully.
+                  All documents have errors. Check error details on each row and use the Upload Assistant for guidance.
+                  Chat will not return useful answers until at least one document is indexed.
                 </p>
               </div>
               <Link href="/chat" className="shrink-0 flex items-center gap-1 text-[11px] text-accent hover:opacity-70 transition-opacity">
@@ -760,33 +806,59 @@ export default function DocumentsPage() {
             </div>
           )}
 
+          {/* Info banner when no collections */}
+          {collections.length === 0 && docs.length === 0 && (
+            <div className="flex items-center gap-3 rounded-xl border border-accent/20 bg-accent/5 px-4 py-3">
+              <Info className="h-4 w-4 text-accent shrink-0" />
+              <p className="text-sm text-text-secondary">
+                Start by creating a collection, then upload your documents. Collections keep your files organized and searchable.
+              </p>
+              <button onClick={() => setShowCreate(true)}
+                className="shrink-0 flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition-opacity">
+                <Plus className="h-3 w-3" /> Create collection
+              </button>
+            </div>
+          )}
+
+          {/* Two-column layout */}
           <div className="grid gap-6 lg:grid-cols-5">
-            {/* Left panel */}
-            <div className="lg:col-span-2 space-y-4">
-              <div className="glass rounded-2xl p-5 sticky top-6 space-y-4">
-                <h2 className="font-bold text-sm flex items-center gap-2">
-                  <UploadCloud className="h-4 w-4 text-accent" /> Add Documents
-                </h2>
-                <UploadZone
-                  collections={collections}
-                  initialCollectionId={filterColl || collections[0]?.id || ''}
-                  onCreate={doc => { setDocs(prev => [doc, ...prev]); refreshCols(); }}
-                  onNeedCollection={() => setShowCreate(true)}
-                />
-                <div className="pt-2 border-t border-border/50">
-                  <p className="text-[11px] text-text-muted font-semibold mb-2 uppercase tracking-wider">Supported Formats</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {['PDF','MD','TXT','CSV','JSON','JS/TS','Python','SQL','YAML','HTML'].map(f => (
-                      <span key={f} className="rounded-md border border-border/60 bg-bg-secondary/40 px-2 py-0.5 text-[10px] font-mono text-text-muted">{f}</span>
-                    ))}
+
+            {/* Left panel — sticky scrollable sidebar */}
+            <div className="lg:col-span-2">
+              <div className="sticky top-4 flex flex-col gap-4 max-h-[calc(100vh-7rem)] overflow-y-auto pb-2">
+
+                {/* Upload panel */}
+                <div className="glass rounded-2xl p-5 space-y-4 shrink-0">
+                  <h2 className="font-bold text-sm flex items-center gap-2">
+                    <UploadCloud className="h-4 w-4 text-accent" /> Add Documents
+                  </h2>
+                  <UploadZone
+                    collections={collections}
+                    initialCollectionId={filterColl || collections[0]?.id || ''}
+                    onCreate={doc => { setDocs(prev => [doc, ...prev]); refreshCols(); }}
+                    onNeedCollection={() => setShowCreate(true)}
+                  />
+                  <div className="pt-2 border-t border-border/50">
+                    <p className="text-[11px] text-text-muted font-semibold mb-2 uppercase tracking-wider">Supported Formats</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['PDF','MD','TXT','CSV','JSON','JS/TS','Python','SQL','YAML','HTML'].map(f => (
+                        <span key={f} className="rounded-md border border-border/60 bg-bg-secondary/40 px-2 py-0.5 text-[10px] font-mono text-text-muted">{f}</span>
+                      ))}
+                    </div>
                   </div>
                 </div>
+
+                {/* Upload Bot — always visible in sidebar */}
+                <div className="shrink-0">
+                  <UploadBot docs={docs} dbHealth={dbHealth} />
+                </div>
+
               </div>
-              <UploadBot docs={docs} dbHealth={dbHealth} />
             </div>
 
-            {/* Right panel */}
+            {/* Right panel — document list */}
             <div className="lg:col-span-3 space-y-3">
+              {/* Filters */}
               <div className="glass rounded-xl px-4 py-3 space-y-3">
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="relative flex-1 min-w-[140px]">
@@ -823,14 +895,15 @@ export default function DocumentsPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    <SortBtn field="name" label="Name" />
-                    <SortBtn field="size" label="Size" />
+                    <SortBtn field="name"      label="Name" />
+                    <SortBtn field="size"      label="Size" />
                     <SortBtn field="createdAt" label="Date" />
-                    <SortBtn field="status" label="Status" />
+                    <SortBtn field="status"    label="Status" />
                   </div>
                 </div>
               </div>
 
+              {/* Document table */}
               <div className="glass rounded-xl overflow-hidden">
                 <div className="border-b border-border px-4 py-2.5 flex items-center justify-between">
                   <p className="text-xs font-semibold text-text-secondary flex items-center gap-2">
@@ -856,12 +929,14 @@ export default function DocumentsPage() {
                   <div className="flex flex-col items-center justify-center py-16 text-center px-4">
                     <FileText className="h-12 w-12 text-text-muted opacity-20 mb-3" />
                     <p className="font-medium text-text-secondary">{docs.length === 0 ? 'No documents yet' : 'No documents match'}</p>
-                    <p className="text-sm text-text-muted mt-1">{docs.length === 0 ? 'Upload your first file to get started.' : 'Try adjusting your filters.'}</p>
+                    <p className="text-sm text-text-muted mt-1">
+                      {docs.length === 0 ? 'Upload files using the panel on the left.' : 'Try adjusting your filters.'}
+                    </p>
                     {docs.length === 0 && (
-                      <button onClick={() => setShowCreate(true)}
+                      <Link href="/chat"
                         className="mt-4 flex items-center gap-1.5 text-xs text-accent hover:underline">
-                        <Plus className="h-3.5 w-3.5" /> Create a collection first
-                      </button>
+                        <ArrowRight className="h-3.5 w-3.5" /> Or try General AI chat instead
+                      </Link>
                     )}
                   </div>
                 ) : (
@@ -880,7 +955,7 @@ export default function DocumentsPage() {
       {previewDoc && <PreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
       {showCreateColl && (
         <CreateCollectionModal
-          onCreated={c => { refreshCols(); }}
+          onCreated={() => { refreshCols(); }}
           onClose={() => setShowCreate(false)}
         />
       )}

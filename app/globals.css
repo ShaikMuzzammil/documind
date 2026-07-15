@@ -133,3 +133,39 @@ html, body {
 .sidebar-transition {
   transition: width 200ms ease, opacity 200ms ease;
 }
+
+/* ── Toast slide-in (used by Toast.tsx) ─────────────────────────────── */
+@keyframes slideInRight {
+  from { transform: translateX(110%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes slideOutRight {
+  from { transform: translateX(0);    opacity: 1; }
+  to   { transform: translateX(110%); opacity: 0; }
+}
+.toast-enter { animation: slideInRight 0.22s cubic-bezier(0.16,1,0.3,1) forwards; }
+.toast-exit  { animation: slideOutRight 0.18s ease-in forwards; }
+
+/* ── Toast container (fixed, top-right) ─────────────────────────────── */
+.toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+  max-width: 420px;
+  width: calc(100vw - 2rem);
+}
+.toast-container > * {
+  pointer-events: auto;
+}
+
+/* ── Upload progress pulse ───────────────────────────────────────────── */
+@keyframes uploadPulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+.upload-pulse { animation: uploadPulse 1.2s ease-in-out infinite; }

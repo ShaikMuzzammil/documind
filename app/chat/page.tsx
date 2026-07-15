@@ -602,19 +602,22 @@ export default function ChatPage() {
 
             <div className="flex items-center gap-2 shrink-0">
               {capabilities?.ai ? (
-                <span className="flex items-center gap-1.5 text-[10px] text-success bg-success/10 border border-success/20 rounded-full px-2 py-0.5">
+                <span className="flex items-center gap-1.5 text-[10px] text-success bg-success/10 border border-success/20 rounded-full px-2 py-0.5 font-medium">
                   <Zap className="h-3 w-3" /> AI ready
                 </span>
               ) : (
-                <Link href="/settings" className="flex items-center gap-1.5 text-[10px] text-warning bg-warning/10 border border-warning/20 rounded-full px-2 py-0.5 hover:bg-warning/20 transition-colors">
-                  Configure AI
+                <Link href="/settings" className="flex items-center gap-1.5 text-[10px] text-warning bg-warning/10 border border-warning/20 rounded-full px-2.5 py-1 hover:bg-warning/20 transition-colors font-medium">
+                  Configure AI →
                 </Link>
               )}
-              {chatMode === 'documents' && (
-                <Link href="/documents" className="flex items-center gap-1.5 text-[10px] text-text-muted hover:text-text-primary bg-bg-card border border-border rounded-full px-2.5 py-1 transition-colors">
-                  <Upload className="h-3 w-3" /> Upload
-                </Link>
-              )}
+              <Link
+                href="/documents"
+                className="flex items-center gap-1.5 rounded-lg border border-border bg-bg-card px-2.5 py-1.5 text-[11px] font-medium text-text-secondary hover:text-text-primary hover:border-accent/30 transition-colors"
+                title="Upload documents"
+              >
+                <Upload className="h-3 w-3" />
+                <span className="hidden sm:inline">Upload docs</span>
+              </Link>
             </div>
           </header>
 
@@ -684,20 +687,17 @@ export default function ChatPage() {
               <div className={`flex items-end gap-2 rounded-2xl border p-2 focus-within:border-accent/50 transition-colors ${
                 chatMode === 'general' ? 'border-purple-500/20 bg-bg-card' : 'border-border bg-bg-card'
               }`}>
-                {chatMode === 'documents' && (
-                  <Link
-                    href="/documents"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-bg-hover hover:text-text-primary transition-colors"
-                    title="Upload documents"
-                  >
-                    <Upload className="h-4 w-4" />
-                  </Link>
-                )}
-                {chatMode === 'general' && (
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-400" title="General AI mode">
-                    <Globe className="h-4 w-4" />
-                  </div>
-                )}
+                <Link
+                  href="/documents"
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                    chatMode === 'documents'
+                      ? 'text-text-muted hover:bg-bg-hover hover:text-accent'
+                      : 'text-text-muted hover:bg-bg-hover hover:text-text-primary'
+                  }`}
+                  title="Upload documents"
+                >
+                  <Upload className="h-4 w-4" />
+                </Link>
 
                 <textarea
                   ref={textareaRef}

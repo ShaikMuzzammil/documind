@@ -34,10 +34,17 @@ const ICONS: Record<ToastType, React.ElementType> = {
 };
 
 const STYLES: Record<ToastType, string> = {
-  success: 'border-success/30 bg-success/10 text-success',
-  error:   'border-danger/30  bg-danger/10  text-danger',
-  warning: 'border-warning/30 bg-warning/10 text-warning',
-  info:    'border-accent/30  bg-accent/10  text-accent',
+  success: 'border-success/40 bg-bg-card text-success shadow-success/10',
+  error:   'border-danger/40  bg-bg-card text-danger  shadow-danger/10',
+  warning: 'border-warning/40 bg-bg-card text-warning shadow-warning/10',
+  info:    'border-accent/40  bg-bg-card text-accent  shadow-accent/10',
+};
+
+const TITLE_STYLES: Record<ToastType, string> = {
+  success: 'text-text-primary',
+  error:   'text-text-primary',
+  warning: 'text-text-primary',
+  info:    'text-text-primary',
 };
 
 function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
@@ -48,23 +55,36 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
   useEffect(() => {
     if (!duration) return;
     const timer = setTimeout(onDismiss, duration);
-    // Animate progress bar
     const el = progressRef.current;
     if (el) {
+      // Force reflow so transition fires
+      el.getBoundingClientRect();
       el.style.transition = `width ${duration}ms linear`;
-      requestAnimationFrame(() => { el.style.width = '0%'; });
+      el.style.width = '0%';
     }
     return () => clearTimeout(timer);
   }, [duration, onDismiss]);
 
   return (
-    <div className={`relative flex items-start gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm min-w-[300px] max-w-[420px] overflow-hidden ${STYLES[toast.type]}`}
-      style={{ animation: 'slideInRight 0.2s ease-out' }}>
+    <div
+      className={`
+        relative flex items-start gap-3 rounded-xl border px-4 py-3
+        shadow-xl backdrop-blur-md overflow-hidden
+        w-[340px] max-w-[calc(100vw-2rem)]
+        ${STYLES[toast.type]}
+      `}
+      style={{ animation: 'toastSlideIn 0.25s cubic-bezier(0.16,1,0.3,1) forwards' }}
+    >
+      {/* Icon */}
       <Icon className="h-4 w-4 shrink-0 mt-0.5" />
+
+      {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold leading-tight">{toast.title}</p>
+        <p className={`text-sm font-semibold leading-tight ${TITLE_STYLES[toast.type]}`}>
+          {toast.title}
+        </p>
         {toast.message && (
-          <p className="mt-0.5 text-xs opacity-80 leading-relaxed">{toast.message}</p>
+          <p className="mt-0.5 text-xs text-text-secondary leading-relaxed">{toast.message}</p>
         )}
         {toast.action && (
           <button
@@ -75,12 +95,24 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
           </button>
         )}
       </div>
-      <button onClick={onDismiss} className="shrink-0 opacity-60 hover:opacity-100 transition-opacity p-0.5">
+
+      {/* Dismiss */}
+      <button
+        onClick={onDismiss}
+        className="shrink-0 p-0.5 opacity-50 hover:opacity-100 transition-opacity rounded"
+        aria-label="Dismiss notification"
+      >
         <X className="h-3.5 w-3.5" />
       </button>
+
+      {/* Progress bar */}
       {!!duration && (
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-current opacity-20">
-          <div ref={progressRef} className="h-full bg-current opacity-60" style={{ width: '100%' }} />
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-current opacity-10">
+          <div
+            ref={progressRef}
+            className="h-full bg-current opacity-50"
+            style={{ width: '100%', transition: 'none' }}
+          />
         </div>
       )}
     </div>
@@ -96,30 +128,41 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const toast = useCallback((opts: Omit<Toast, 'id'>): string => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setToasts(prev => [...prev.slice(-4), { ...opts, id }]); // max 5 toasts
+    setToasts(prev => [...prev.slice(-4), { ...opts, id }]);
     return id;
   }, []);
 
-  const success = useCallback((title: string, message?: string) => toast({ type: 'success', title, message }), [toast]);
-  const error   = useCallback((title: string, message?: string) => toast({ type: 'error',   title, message, duration: 8000 }), [toast]);
-  const warning = useCallback((title: string, message?: string) => toast({ type: 'warning', title, message, duration: 7000 }), [toast]);
-  const info    = useCallback((title: string, message?: string) => toast({ type: 'info',    title, message }), [toast]);
+  const success = useCallback((title: string, message?: string) =>
+    toast({ type: 'success', title, message, duration: 4000 }), [toast]);
+  const error   = useCallback((title: string, message?: string) =>
+    toast({ type: 'error', title, message, duration: 8000 }), [toast]);
+  const warning = useCallback((title: string, message?: string) =>
+    toast({ type: 'warning', title, message, duration: 6000 }), [toast]);
+  const info    = useCallback((title: string, message?: string) =>
+    toast({ type: 'info', title, message, duration: 4000 }), [toast]);
 
   return (
     <ToastContext.Provider value={{ toasts, toast, dismiss, success, error, warning, info }}>
       {children}
-      {/* Toast portal */}
-      <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 items-end pointer-events-none">
+
+      {/* Toast container — fixed top-right */}
+      <div
+        aria-live="polite"
+        aria-atomic="false"
+        className="fixed top-4 right-4 z-[9999] flex flex-col gap-2.5 items-end pointer-events-none"
+        style={{ maxWidth: 380 }}
+      >
         {toasts.map(t => (
           <div key={t.id} className="pointer-events-auto">
             <ToastItem toast={t} onDismiss={() => dismiss(t.id)} />
           </div>
         ))}
       </div>
+
       <style>{`
-        @keyframes slideInRight {
-          from { transform: translateX(100%); opacity: 0; }
-          to   { transform: translateX(0);    opacity: 1; }
+        @keyframes toastSlideIn {
+          from { transform: translateX(calc(100% + 1rem)); opacity: 0; }
+          to   { transform: translateX(0); opacity: 1; }
         }
       `}</style>
     </ToastContext.Provider>
