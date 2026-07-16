@@ -5,7 +5,7 @@ import {
   CheckCircle2, Download, FolderOpen, Lock,
   Sparkles, ChevronRight, Upload, BookOpen,
   Terminal, Database, Star, Brain, FileSearch,
-  Cpu, AlignLeft, Workflow,
+  Cpu, AlignLeft, Workflow, Play,
 } from 'lucide-react';
 import FAQ from '@/components/landing/FAQ';
 
@@ -83,12 +83,12 @@ const USE_CASES = [
 ];
 
 const TECH_STACK = [
-  { label: 'Next.js 16', sublabel: 'App Router' },
-  { label: 'pgvector', sublabel: 'Cosine similarity' },
-  { label: 'OpenAI-compatible', sublabel: 'Any LLM provider' },
-  { label: 'Vercel + Neon', sublabel: 'Zero-config deploy' },
-  { label: 'TypeScript', sublabel: 'Strict mode' },
-  { label: 'HMAC auth', sublabel: 'No OAuth' },
+  { label: 'Next.js 16',          sublabel: 'App Router' },
+  { label: 'pgvector',            sublabel: 'Cosine similarity' },
+  { label: 'OpenAI-compatible',   sublabel: 'Any LLM provider' },
+  { label: 'Vercel + Neon',       sublabel: 'Zero-config deploy' },
+  { label: 'TypeScript',          sublabel: 'Strict mode' },
+  { label: 'HMAC auth',           sublabel: 'No OAuth' },
 ];
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
@@ -97,24 +97,25 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary overflow-x-hidden">
 
-      {/* ── Hero ─────────────────────────────────────────────────── */}
-      <section className="relative pt-20 pb-14 overflow-hidden">
+      {/* ── Hero — text + CTAs only, no demo ────────────────────── */}
+      <section className="relative pt-20 pb-16 overflow-hidden">
         {/* Background glow */}
         <div className="pointer-events-none absolute inset-0 hero-glow" />
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-1/2 top-[-80px] -translate-x-1/2 h-[420px] w-[700px] rounded-full bg-accent/7 blur-[110px]" />
+          <div className="absolute left-1/2 top-[-80px] -translate-x-1/2 h-[480px] w-[800px] rounded-full bg-accent/7 blur-[120px]" />
           <div className="absolute right-0 top-24 h-56 w-56 rounded-full bg-cyan-500/6 blur-[80px]" />
+          <div className="absolute left-0 bottom-12 h-40 w-40 rounded-full bg-purple-500/5 blur-[60px]" />
         </div>
 
-        <div className="relative mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 text-center">
+        <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
           {/* Badge */}
           <div className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent/8 px-4 py-1.5 text-xs font-semibold text-accent mb-8">
             <Sparkles className="h-3.5 w-3.5" />
             Retrieval-Augmented Generation (RAG) · Open source · pgvector + Next.js
           </div>
 
-          {/* Headline — intentionally restrained sizing */}
-          <h1 className="text-[2.2rem] sm:text-[3rem] lg:text-[3.6rem] font-bold tracking-tight leading-[1.1] max-w-3xl mx-auto">
+          {/* Headline */}
+          <h1 className="text-[2.2rem] sm:text-[3rem] lg:text-[3.8rem] font-bold tracking-tight leading-[1.1] max-w-3xl mx-auto">
             Your documents,{' '}
             <span className="bg-gradient-to-r from-accent via-purple-400 to-cyan-400 bg-clip-text text-transparent">
               intelligently answered
@@ -143,7 +144,7 @@ export default function LandingPage() {
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               href="/auth?mode=register"
-              className="flex items-center gap-2 rounded-2xl bg-accent px-7 py-3.5 text-sm font-bold text-white hover:opacity-90 transition-opacity shadow-lg shadow-accent/25"
+              className="flex items-center gap-2 rounded-2xl bg-accent px-8 py-3.5 text-sm font-bold text-white hover:opacity-90 transition-opacity shadow-lg shadow-accent/25"
             >
               Start for free <ArrowRight className="h-4 w-4" />
             </Link>
@@ -156,62 +157,12 @@ export default function LandingPage() {
           </div>
           <p className="mt-3 text-xs text-text-muted">No credit card required · Self-hostable on Vercel + Neon</p>
         </div>
-
-        {/* Demo window */}
-        <div className="relative mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 mt-12">
-          <div className="glass rounded-2xl overflow-hidden shadow-2xl shadow-black/40 border border-border/70">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-border/50 bg-bg-secondary/60">
-              <div className="flex gap-1.5">
-                <span className="h-3 w-3 rounded-full bg-red-400/70" />
-                <span className="h-3 w-3 rounded-full bg-yellow-400/70" />
-                <span className="h-3 w-3 rounded-full bg-green-400/70" />
-              </div>
-              <span className="flex-1 text-center text-xs font-mono text-text-muted">DocuMind Chat</span>
-              <Bot className="h-3.5 w-3.5 text-accent" />
-            </div>
-            <div className="px-5 py-5 space-y-4 bg-bg-primary/40">
-              <div className="flex justify-end">
-                <div className="max-w-xs rounded-2xl rounded-tr-sm bg-accent px-4 py-2.5 text-sm text-white">
-                  What are the main risk factors in the Q3 report?
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-accent/25 bg-accent/10">
-                  <Bot className="h-4 w-4 text-accent" />
-                </div>
-                <div className="max-w-lg rounded-2xl rounded-tl-sm border border-border bg-bg-card px-4 py-3 text-sm text-text-primary">
-                  The report identifies <strong>three key risk factors</strong>:
-                  <ol className="mt-2 space-y-1 pl-4 list-decimal text-text-secondary text-sm">
-                    <li>Supply chain disruption in Q3 <sup className="text-accent font-bold">[1]</sup></li>
-                    <li>Regulatory gaps in APAC markets <sup className="text-accent font-bold">[2]</sup></li>
-                    <li>R&D talent retention pressure <sup className="text-accent font-bold">[3]</sup></li>
-                  </ol>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {[{n:1,doc:'Q3-Risk-Report.pdf',s:94},{n:2,doc:'Compliance-APAC.pdf',s:87},{n:3,doc:'HR-Analysis.md',s:81}].map(({n,doc,s})=>(
-                      <div key={n} className="flex items-center gap-1.5 rounded-lg border border-border/50 bg-bg-secondary/40 px-2 py-1">
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-accent/15 text-[9px] font-bold text-accent">{n}</span>
-                        <span className="text-[11px] text-text-secondary">{doc}</span>
-                        <span className="text-[10px] font-bold text-success">{s}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border/50 bg-bg-secondary/30">
-              <span className="flex-1 text-sm text-text-muted pl-2">Ask anything about your documents…</span>
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-white">
-                <ArrowRight className="h-3.5 w-3.5" />
-              </div>
-            </div>
-          </div>
-        </div>
       </section>
 
-      {/* ── Tech stack strip ─────────────────────────────────────── */}
+      {/* ── Tech stack strip — immediately after hero ────────────── */}
       <section className="py-8 border-y border-border/30 bg-bg-secondary/20">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-5">
+          <p className="text-center text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-6">
             Built on production-grade open-source infrastructure
           </p>
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
@@ -221,6 +172,100 @@ export default function LandingPage() {
                 <p className="text-[10px] text-text-muted mt-0.5">{sublabel}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Demo showcase — below tech strip ─────────────────────── */}
+      <section className="py-16 border-b border-border/30">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+
+          {/* Section label */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent/8 px-3 py-1 text-xs font-semibold text-accent mb-3">
+              <Play className="h-3 w-3" /> Live demo
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold">See DocuMind answer your documents</h2>
+            <p className="mt-2 text-sm text-text-secondary max-w-md mx-auto">
+              Every AI answer includes numbered citations — click any source to read the exact passage it came from.
+            </p>
+          </div>
+
+          {/* Demo window */}
+          <div className="mx-auto max-w-3xl">
+            <div className="glass rounded-2xl overflow-hidden shadow-2xl shadow-black/50 border border-border/70">
+              {/* Window chrome */}
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-border/50 bg-bg-secondary/70">
+                <div className="flex gap-1.5">
+                  <span className="h-3 w-3 rounded-full bg-red-400/70" />
+                  <span className="h-3 w-3 rounded-full bg-yellow-400/70" />
+                  <span className="h-3 w-3 rounded-full bg-green-400/70" />
+                </div>
+                <span className="flex-1 text-center text-xs font-mono text-text-muted">DocuMind Chat</span>
+                <Bot className="h-3.5 w-3.5 text-accent" />
+              </div>
+
+              {/* Chat messages */}
+              <div className="px-5 py-5 space-y-4 bg-bg-primary/50">
+                {/* User message */}
+                <div className="flex justify-end">
+                  <div className="max-w-xs rounded-2xl rounded-tr-sm bg-accent px-4 py-2.5 text-sm text-white">
+                    What are the main risk factors in the Q3 report?
+                  </div>
+                </div>
+
+                {/* AI response */}
+                <div className="flex gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-accent/25 bg-accent/10">
+                    <Bot className="h-4 w-4 text-accent" />
+                  </div>
+                  <div className="max-w-lg rounded-2xl rounded-tl-sm border border-border bg-bg-card px-4 py-3 text-sm text-text-primary">
+                    The report identifies <strong>three key risk factors</strong>:
+                    <ol className="mt-2 space-y-1 pl-4 list-decimal text-text-secondary text-sm">
+                      <li>Supply chain disruption in Q3 <sup className="text-accent font-bold">[1]</sup></li>
+                      <li>Regulatory gaps in APAC markets <sup className="text-accent font-bold">[2]</sup></li>
+                      <li>R&D talent retention pressure <sup className="text-accent font-bold">[3]</sup></li>
+                    </ol>
+
+                    {/* Source citations */}
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {[
+                        { n: 1, doc: 'Q3-Risk-Report.pdf',    s: 94 },
+                        { n: 2, doc: 'Compliance-APAC.pdf',   s: 87 },
+                        { n: 3, doc: 'HR-Analysis.md',        s: 81 },
+                      ].map(({ n, doc, s }) => (
+                        <div key={n} className="flex items-center gap-1.5 rounded-lg border border-border/50 bg-bg-secondary/50 px-2 py-1">
+                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-accent/15 text-[9px] font-bold text-accent">{n}</span>
+                          <span className="text-[11px] text-text-secondary">{doc}</span>
+                          <span className="text-[10px] font-bold text-success">{s}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Composer bar */}
+              <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border/50 bg-bg-secondary/40">
+                <span className="flex-1 text-sm text-text-muted pl-2">Ask anything about your documents…</span>
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-white">
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </div>
+              </div>
+            </div>
+
+            {/* Demo caption */}
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-text-muted">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5 text-success" /> Citations linked to source passages
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5 text-success" /> Relevance score per source
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5 text-success" /> Multi-document context
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -379,12 +424,12 @@ export default function LandingPage() {
               </div>
               <div className="space-y-3">
                 {[
-                  { step: '1', label: 'Your question', desc: 'Converted to a vector embedding', color: 'bg-accent/10 border-accent/20 text-accent' },
-                  { step: '2', label: 'Vector search', desc: 'pgvector retrieves the top-k passages by cosine similarity', color: 'bg-purple-400/10 border-purple-400/20 text-purple-400' },
-                  { step: '3', label: 'Grounded prompt', desc: 'Retrieved passages + your question sent to the LLM', color: 'bg-cyan-400/10 border-cyan-400/20 text-cyan-400' },
-                  { step: '4', label: 'Cited answer', desc: 'Response with source citations you can verify', color: 'bg-success/10 border-success/20 text-success' },
+                  { step: '1', label: 'Your question',   desc: 'Converted to a vector embedding',                                      color: 'bg-accent/10 border-accent/20 text-accent' },
+                  { step: '2', label: 'Vector search',   desc: 'pgvector retrieves the top-k passages by cosine similarity',           color: 'bg-purple-400/10 border-purple-400/20 text-purple-400' },
+                  { step: '3', label: 'Grounded prompt', desc: 'Retrieved passages + your question sent to the LLM',                   color: 'bg-cyan-400/10 border-cyan-400/20 text-cyan-400' },
+                  { step: '4', label: 'Cited answer',    desc: 'Response with source citations you can verify',                        color: 'bg-success/10 border-success/20 text-success' },
                 ].map(({ step, label, desc, color }) => (
-                  <div key={step} className={`flex items-start gap-3 rounded-xl border p-3 ${color.split(' ').slice(0,2).join(' ')}`}>
+                  <div key={step} className={`flex items-start gap-3 rounded-xl border p-3 ${color.split(' ').slice(0, 2).join(' ')}`}>
                     <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${color}`}>{step}</span>
                     <div>
                       <p className="text-xs font-semibold text-text-primary">{label}</p>
@@ -463,7 +508,7 @@ export default function LandingPage() {
                 <Bot className="h-3.5 w-3.5" />
               </div>
               <span className="font-bold text-sm">DocuMind</span>
-              <span className="text-xs text-text-muted">v8.4</span>
+              <span className="text-xs text-text-muted">v8.5</span>
             </div>
             <p className="text-xs text-text-muted">
               Built with Next.js · pgvector · OpenAI-compatible · Deployed on Vercel
